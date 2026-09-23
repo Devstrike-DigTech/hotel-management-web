@@ -236,7 +236,8 @@ export function BookingReview({
       .catch(() => undefined);
     return () => ctl.abort();
   }, [member, programme, hotel.slug]);
-  const offer = redeemOffer(quote?.loyalty, programme, hotel.groupName ?? hotel.name);
+  // Points come off nightly stays only (the API refuses them on day use).
+  const offer = quote?.stayType === "DAY_USE" ? null : redeemOffer(quote?.loyalty, programme, hotel.groupName ?? hotel.name);
   const redeemed = quote?.loyalty && quote.loyalty.pointsRedeemed > 0 ? { points: quote.loyalty.pointsRedeemed, discountKobo: quote.loyalty.redeemValueKobo } : null;
 
   useEffect(() => {
