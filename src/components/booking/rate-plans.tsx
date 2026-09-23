@@ -8,8 +8,9 @@ import { isNonRefundable, nightlyRange, nightlyVaries, planTitle, type PlanOffer
 import { formatLagosDateTime, formatLagosShort, policyTail } from "@/lib/time";
 
 /** Small marks that sit beside a plan's name. */
-export function PlanBadges({ plan, className = "" }: { plan: PlanOffer; className?: string }) {
+export function PlanBadges({ plan, className = "", quiet = false }: { plan: PlanOffer; className?: string; /** Leave out the free-cancellation mark when a sentence beside it says so. */ quiet?: boolean }) {
   const locked = isNonRefundable(plan);
+  if (quiet && !locked && !plan.includesBreakfast && !plan.adjustmentLabel && !(plan.minNights && plan.minNights > 1)) return null;
   return (
     <span className={`inline-flex flex-wrap items-center gap-1.5 ${className}`}>
       {plan.includesBreakfast ? (
@@ -21,7 +22,7 @@ export function PlanBadges({ plan, className = "" }: { plan: PlanOffer; classNam
         <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted">
           <LockSimple size={11} weight="bold" aria-hidden /> Non-refundable
         </span>
-      ) : (
+      ) : quiet ? null : (
         <span className="inline-flex items-center gap-1 rounded-full border border-palm/40 px-2 py-0.5 text-[11px] text-palm">
           <ShieldCheck size={12} weight="fill" aria-hidden /> Free cancellation
         </span>
@@ -60,7 +61,7 @@ export function planPolicyText(plan: PlanOffer, fallback: CancellationPolicy | n
 /** How much a plan saves against the flexible rate for the same dates. */
 export function savingAgainst(plan: PlanOffer, plans: PlanOffer[]): number {
   const flexible = plans.find((p) => p.kind === "BAR") ?? plans.find((p) => !isNonRefundable(p));
-  if (!flexible || flexible.id === plan.id || !flexible.quote || !plan.quote) return 0;
+  if (!flexible || flexible.id === plan.id || !flexible.quote || !plan.quote || !plan.bookable) return 0;
   return Math.max(0, flexible.quote.totalKobo - plan.quote.totalKobo);
 }
 
@@ -104,7 +105,7 @@ export function PlanChoice({
             <span className="flex items-start justify-between gap-3">
               <span className="min-w-0">
                 <span className="display-sm block text-[1.2rem] leading-tight">{planTitle(p)}</span>
-                <PlanBadges plan={p} className="mt-2" />
+                <PlanBadges plan={p} className="mt-2" quiet />
               </span>
               <span aria-hidden className={`mt-1 grid size-5 shrink-0 place-items-center rounded-full border ${on ? "border-laterite bg-laterite text-laterite-ink" : "border-line-strong"}`}>
                 {on ? <Check size={11} weight="bold" /> : null}
@@ -182,11 +183,11 @@ export function PlanLedger({
         {plans.map((p) => {
           const save = savingAgainst(p, plans);
           return (
-            <li key={p.id} className="grid gap-x-6 gap-y-2 px-4 py-3.5 sm:grid-cols-[1fr_auto_auto] sm:items-center" data-testid="plan-row" data-plan-kind={p.kind}>
-              <div className="min-w-0">
+            <li key={p.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2.5 px-4 py-3.5 sm:grid-cols-[1fr_auto_auto] sm:gap-x-6" data-testid="plan-row" data-plan-kind={p.kind}>
+              <div className="col-span-2 min-w-0 sm:col-span-1">
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <span className="font-medium">{planTitle(p)}</span>
-                  <PlanBadges plan={p} />
+                  <PlanBadges plan={p} quiet />
                 </p>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-ink-muted">{!p.bookable && p.reason ? p.reason : planPolicyText(p, fallbackPolicy, freeUntil, true)}</p>
               </div>
@@ -207,13 +208,11 @@ export function PlanLedger({
                 ) : null}
               </div>
               {p.bookable || !p.quote ? (
-                <Link href={hrefFor(p.id)} className="btn btn-outline group !min-h-10 w-full !px-4 text-sm sm:w-auto" aria-label={`Book the ${roomName}, ${planTitle(p)} rate`}>
+                <Link href={hrefFor(p.id)} className="btn btn-outline group !min-h-10 !px-4 text-sm" aria-label={`Book the ${roomName}, ${planTitle(p)} rate`}>
                   Choose <ArrowRight size={14} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
                 </Link>
               ) : (
-                <span className="btn btn-outline !min-h-10 w-full cursor-not-allowed !px-4 text-sm opacity-50 sm:w-auto" aria-disabled="true">
-                  Not available
-                </span>
+                <span className="kicker w-[5.6rem] text-right !text-[10px] sm:text-center">Not for these dates</span>
               )}
             </li>
           );

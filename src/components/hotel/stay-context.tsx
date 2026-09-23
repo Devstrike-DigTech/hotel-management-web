@@ -226,10 +226,12 @@ export function RoomOffer({ room }: { room: RoomTypePublic }) {
         {dated && live?.quote && live.bookable ? (
           <>
             <p className="kicker">
-              {several ? "From, " : ""}
               {nights} {nights === 1 ? "night" : "nights"}, all in
             </p>
-            <p className={`num mt-1 text-2xl font-medium transition-opacity ${loading ? "opacity-40" : ""}`}>{formatNaira(best!.totalKobo)}</p>
+            <p className={`mt-1 transition-opacity ${loading ? "opacity-40" : ""}`}>
+              {several ? <span className="mr-1.5 text-[12.5px] text-ink-muted">from</span> : null}
+              <span className="num text-2xl font-medium">{formatNaira(best!.totalKobo)}</span>
+            </p>
             <p className="mt-1 text-[12.5px] text-ink-muted">{nightlyLine(best!)}</p>
             <p className={`kicker mt-2.5 ${live.lowAvailability ? "!text-laterite" : "!text-palm"}`}>
               {live.lowAvailability ? `Only ${live.available} left` : "Free for your dates"}
@@ -271,8 +273,8 @@ export function RoomOffer({ room }: { room: RoomTypePublic }) {
           Not available
         </span>
       ) : several ? (
-        <a href={`#rates-${roomId}`} className="btn btn-ink group w-full sm:w-auto" aria-label={`See the rates for the ${name}`}>
-          {plans.length} rates <ArrowRight size={15} aria-hidden className="rotate-90 transition-transform group-hover:translate-y-0.5" />
+        <a href={`#rates-${roomId}`} className="kicker inline-flex items-center gap-1.5 hover:text-ink" aria-label={`The ${plans.length} rates for the ${name}, below`}>
+          {plans.length} rates below <ArrowRight size={12} aria-hidden className="rotate-90" />
         </a>
       ) : (
         <Link href={bookHref(roomId)} className="btn btn-ink group w-full sm:w-auto" aria-label={`Select ${name}`}>

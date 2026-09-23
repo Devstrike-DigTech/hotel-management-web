@@ -599,8 +599,7 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
         {b.lines.length > 1 ? (
           <div>
             <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 font-sans text-xs text-ink-muted hover:text-ink">
-              <CaretDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} aria-hidden /> {open ? "Hide" : "Show"} each night
-              {varies ? <span className="text-ink-muted">: prices change with the dates</span> : null}
+              <CaretDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} aria-hidden /> {open ? "Hide" : "Show"} each night{varies ? " (prices change with the dates)" : ""}
             </button>
             {open ? (
               <ul className="mt-2 space-y-1.5 border-l border-line pl-3 text-[12.5px] text-ink-muted" data-testid="night-lines">
@@ -610,7 +609,7 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
                       <span className="num text-ink">
                         {formatWeekday(l.date)} {formatShort(l.date)}
                       </span>
-                      {seasons.get(l.date) ? <span className="ml-2 rounded-xs bg-brass/[0.12] px-1.5 py-px text-[11px] text-ink">{seasons.get(l.date)}</span> : null}
+                      {seasons.get(l.date) ? <span className="ml-2 inline-block whitespace-nowrap rounded-xs bg-brass/[0.12] px-1.5 py-px text-[11px] text-ink">{seasons.get(l.date)}</span> : null}
                     </span>
                     <span aria-hidden className="leader" />
                     <span data-testid="night-amount">{formatNaira(l.amountKobo)}</span>

@@ -192,6 +192,8 @@ src/
     ui/                       wordmark, photo plate, money, amenity icons, theme toggle
   lib/
     api.ts, types.ts          typed, server-only client for the public API
+    rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
+    server/client-ip.ts       the visitor's address and the trusted-proxy headers
     booking-types.ts          M3 contract types
     client-api.ts             browser client: timeouts, retries, idempotency keys, guarded sessionStorage
     server/bff.ts             the gateway: route allow-list, cookie sessions, single-flight refresh
@@ -343,7 +345,18 @@ forwards only `public/*` and `guest/*` routes:
 
 Prices now move with the calendar. The contract is the backend's `API-M4.md` (sections 0 and 5.2, 6).
 
-<!-- M4 screenshots -->
+| Rates on the hotel page | The price calendar, Detty December and a closed arrival day | Review: each night, the promo, the saving |
+|---|---|---|
+| ![](docs/screenshots/m4-hotel-rates-1440-light.png) | ![](docs/screenshots/m4-hotel-calendar-1440-light.png) | ![](docs/screenshots/m4-book-review-1440-light.png) |
+
+| Step one: seasons and rates (phone, dark) | A refused code, said plainly | Microsite rates (dark) |
+|---|---|---|
+| ![](docs/screenshots/m4-book-stay-390-dark.png) | ![](docs/screenshots/m4-book-promo-error-1440-light.png) | ![](docs/screenshots/m4-microsite-rates-1440-dark.png) |
+
+All M4 screens are in [`docs/screenshots/`](docs/screenshots) as `m4-*.png` at 1440 and 390, light and dark, taken
+against the live backend and its M4 seed (Palmwine House, 14 to 16 December), grain off and quantised to 128 colours.
+The M4 building blocks in every state (calendar ready, loading and offline; rate cards dated and undated; each promo
+refusal) are on `/dev/preview?only=rates`.
 
 ### Rate plans
 
@@ -434,6 +447,8 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `booking.spec.ts` | Book online, hold, pay on the mock checkout, land on the confirmation card with paid and balance; pay-at-hotel booking; a microsite booking stays on the hotel's site |
 | `account.spec.ts` | OTP sign-in (code read from the dev outbox and pasted) shows the earlier booking in Trips; a wrong code is refused and corrected by typing; cancelling a paid booking shows and issues the full refund |
 | `review.spec.ts` | Books and pays tonight's stay, checks it in and out through the staff API, then reviews it from the link; a second visit says it was already reviewed |
+| `rates.spec.ts` | M4: promo code booking (saving shown and charged), non-refundable rate (microsite and review step), a Detty December stay priced night by night (see the M4 section) |
+| `trusted-ip.spec.ts` | M4: which visitor address is sent and how, the secret absent from browser bundles, and live per-visitor rate-limit buckets |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the
@@ -450,6 +465,18 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
   guest book is left as seeded (platform credentials: `E2E_PLATFORM_EMAIL`, `E2E_PLATFORM_PASSWORD`).
 - The API's `whatsappShareUrl` includes the manage link (which can cancel the booking); the card builds its own
   share text with dates and directions instead.
+
+## Contract notes (M4)
+
+- Rates, plans, the price calendar, promo codes and restrictions match `API-M4.md` section 5.2 and 6 against the live backend.
+- `API-M4.md` suggests the **first** `X-Forwarded-For` hop as the visitor's address. The first hop is whatever the client
+  wrote, so this app sends the **last** hop (the one our edge appended) or a configured platform header instead.
+- A plan's `label` mixes the discount and other terms (`"-10%, Non-refundable"`, `"-15%, 7+ nights"`); the discount is
+  read out of it and the other terms come from `refundable`, `includesBreakfast` and `minNights`.
+- Before M4 reached the backend, availability refused `channel` with a `VALIDATION_ERROR`; the client drops the parameter
+  once if that happens, so an older backend keeps working.
+- The trusted headers only take effect once the backend's `.env` has the same `TRUSTED_PROXY_SECRET` (16 characters or
+  more) as this app's.
 
 ## Not done yet
 

@@ -327,11 +327,15 @@ function lowestIn(days: CalendarDays | undefined, month: ISODate): number | null
   if (!days) return null;
   let low: number | null = null;
   const prefix = month.slice(0, 7);
+  const prices: number[] = [];
   for (const [d, info] of Object.entries(days)) {
     if (!d.startsWith(prefix) || info.soldOut || info.closedToArrival || !info.fromKobo) continue;
+    prices.push(info.fromKobo);
     if (low === null || info.fromKobo < low) low = info.fromKobo;
   }
-  return low;
+  // Only worth marking when the low days stand out: not when most of the month is at that price.
+  const atLow = prices.filter((p) => p === low).length;
+  return prices.length && atLow / prices.length <= 0.4 ? low : null;
 }
 
 /** The minimum-stay hint for the day in play: the chosen check-in, else the day being looked at. */
