@@ -1,0 +1,584 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ *  Laterite & Adire — design tokens
+ *  A Lagos boutique hotel's printed stationery meets a Swiss ledger.
+ * ------------------------------------------------------------------ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --paper: #f4efe6;
+  --surface: #fbf8f2;
+  --surface-2: #ede6da;
+  --ink: #1b1a17;
+  --ink-muted: #6b645a;
+  --line: #e0d7c8;
+  --line-strong: #cbbfac;
+  --laterite: #b4452a;
+  --laterite-ink: #fff6ef;
+  --brass: #b98a2e;
+  --palm: #2f5a43;
+  --adire: #22324f;
+  --ochre: #c77d1a;
+  --danger: #a32b2b;
+
+  --grain-opacity: 0.035;
+  --grain-blend: multiply;
+  --shadow-float: 0 1px 2px rgb(27 26 23 / 0.06), 0 12px 32px -8px rgb(27 26 23 / 0.18);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #13110e;
+  --surface: #1c1915;
+  --surface-2: #26221d;
+  --ink: #efe8dc;
+  --ink-muted: #a69d8f;
+  --line: #332e27;
+  --line-strong: #4a4339;
+  --laterite: #e0714b;
+  --laterite-ink: #1b0d08;
+  --brass: #d6a94a;
+  --palm: #6fae8a;
+  --adire: #8ea3c9;
+  --ochre: #e3a04a;
+  --danger: #e26464;
+
+  --grain-opacity: 0.06;
+  --grain-blend: screen;
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.6);
+
+  color-scheme: dark;
+}
+
+/* No-JS fallback: follow the system when no theme has been resolved yet. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --paper: #13110e;
+    --surface: #1c1915;
+    --surface-2: #26221d;
+    --ink: #efe8dc;
+    --ink-muted: #a69d8f;
+    --line: #332e27;
+    --line-strong: #4a4339;
+    --laterite: #e0714b;
+    --laterite-ink: #1b0d08;
+    --brass: #d6a94a;
+    --palm: #6fae8a;
+    --adire: #8ea3c9;
+    --ochre: #e3a04a;
+    --danger: #e26464;
+    --grain-opacity: 0.06;
+    --grain-blend: screen;
+    color-scheme: dark;
+  }
+}
+
+/* Remove Tailwind's default palette entirely: only our tokens exist. */
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-laterite: var(--laterite);
+  --color-laterite-ink: var(--laterite-ink);
+  --color-brass: var(--brass);
+  --color-palm: var(--palm);
+  --color-adire: var(--adire);
+  --color-ochre: var(--ochre);
+  --color-danger: var(--danger);
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --breakpoint-xs: 26rem;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Base
+ * ------------------------------------------------------------------ */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    position: relative;
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Paper grain: a tiny inline SVG noise over the page at a few percent. */
+  body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -0.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  [data-theme="dark"] body::before {
+    filter: invert(1);
+  }
+
+  ::selection {
+    background: var(--laterite);
+    color: var(--laterite-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--laterite);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  summary {
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Typography
+ * ------------------------------------------------------------------ */
+
+@utility display {
+  font-family: var(--font-display);
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 30;
+  font-weight: 380;
+  letter-spacing: -0.035em;
+  line-height: 0.94;
+}
+
+@utility display-md {
+  font-family: var(--font-display);
+  font-variation-settings:
+    "opsz" 96,
+    "SOFT" 40;
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1.04;
+}
+
+@utility display-sm {
+  font-family: var(--font-display);
+  font-variation-settings:
+    "opsz" 36,
+    "SOFT" 50;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+/* Italic accent: Fraunces' soft, wonky italic in laterite. */
+@utility accent {
+  font-style: italic;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 100,
+    "WONK" 1;
+  color: var(--laterite);
+  font-weight: 340;
+}
+
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@utility prose-body {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--ink);
+  & p + p {
+    margin-top: 1.1em;
+  }
+}
+
+/* Magazine drop cap on the first paragraph. */
+@utility drop-cap {
+  & > p:first-of-type::first-letter {
+    float: left;
+    font-family: var(--font-display);
+    font-variation-settings:
+      "opsz" 144,
+      "SOFT" 100;
+    font-size: 5.05em;
+    line-height: 0.82;
+    padding: 0.07em 0.1em 0 0;
+    color: var(--laterite);
+    font-weight: 350;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Adire motifs — thin-line SVGs used as CSS masks so they take currentColor.
+ * ------------------------------------------------------------------ */
+
+@utility adire-rule {
+  display: block;
+  height: 20px;
+  width: 100%;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='20' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 10h7.5M20.5 10h14.5M49 10h15'/%3E%3Ccircle cx='14' cy='10' r='6'/%3E%3Ccircle cx='14' cy='10' r='2.25' fill='%23000' stroke='none'/%3E%3Cpath d='M42 3l7 7-7 7-7-7z'/%3E%3Cpath d='M42 7l3 3-3 3-3-3z'/%3E%3Cpath d='M56.5 5.5v9M59.5 7v6'/%3E%3C/svg%3E")
+    repeat-x left center / 64px 20px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='20' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 10h7.5M20.5 10h14.5M49 10h15'/%3E%3Ccircle cx='14' cy='10' r='6'/%3E%3Ccircle cx='14' cy='10' r='2.25' fill='%23000' stroke='none'/%3E%3Cpath d='M42 3l7 7-7 7-7-7z'/%3E%3Cpath d='M42 7l3 3-3 3-3-3z'/%3E%3Cpath d='M56.5 5.5v9M59.5 7v6'/%3E%3C/svg%3E")
+    repeat-x left center / 64px 20px;
+}
+
+/* A patchwork field in the manner of adire eleko: rings, stripes, dots, crosses. */
+@utility adire-field {
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M36 0v72M0 36h72'/%3E%3Ccircle cx='18' cy='18' r='11'/%3E%3Ccircle cx='18' cy='18' r='6'/%3E%3Ccircle cx='18' cy='18' r='1.5' fill='%23000'/%3E%3Cpath d='M42 9h24M42 15h24M42 21h24M42 27h24'/%3E%3Cg fill='%23000' stroke='none'%3E%3Ccircle cx='8' cy='44' r='1.5'/%3E%3Ccircle cx='18' cy='44' r='1.5'/%3E%3Ccircle cx='28' cy='44' r='1.5'/%3E%3Ccircle cx='8' cy='54' r='1.5'/%3E%3Ccircle cx='18' cy='54' r='1.5'/%3E%3Ccircle cx='28' cy='54' r='1.5'/%3E%3Ccircle cx='8' cy='64' r='1.5'/%3E%3Ccircle cx='18' cy='64' r='1.5'/%3E%3Ccircle cx='28' cy='64' r='1.5'/%3E%3C/g%3E%3Cpath d='M54 42l12 12-12 12-12-12z'/%3E%3Cpath d='M42 42l24 24M66 42L42 66'/%3E%3C/svg%3E")
+    repeat 0 0 / 72px 72px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M36 0v72M0 36h72'/%3E%3Ccircle cx='18' cy='18' r='11'/%3E%3Ccircle cx='18' cy='18' r='6'/%3E%3Ccircle cx='18' cy='18' r='1.5' fill='%23000'/%3E%3Cpath d='M42 9h24M42 15h24M42 21h24M42 27h24'/%3E%3Cg fill='%23000' stroke='none'%3E%3Ccircle cx='8' cy='44' r='1.5'/%3E%3Ccircle cx='18' cy='44' r='1.5'/%3E%3Ccircle cx='28' cy='44' r='1.5'/%3E%3Ccircle cx='8' cy='54' r='1.5'/%3E%3Ccircle cx='18' cy='54' r='1.5'/%3E%3Ccircle cx='28' cy='54' r='1.5'/%3E%3Ccircle cx='8' cy='64' r='1.5'/%3E%3Ccircle cx='18' cy='64' r='1.5'/%3E%3Ccircle cx='28' cy='64' r='1.5'/%3E%3C/g%3E%3Cpath d='M54 42l12 12-12 12-12-12z'/%3E%3Cpath d='M42 42l24 24M66 42L42 66'/%3E%3C/svg%3E")
+    repeat 0 0 / 72px 72px;
+}
+
+/* Dotted leader for contents-page rows. */
+@utility leader {
+  flex: 1 1 auto;
+  min-width: 1.5rem;
+  height: 2px;
+  align-self: flex-end;
+  margin-bottom: 0.5em;
+  background-image: radial-gradient(circle, var(--line-strong) 0.9px, transparent 1.1px);
+  background-size: 7px 2px;
+  background-repeat: repeat-x;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Components
+ * ------------------------------------------------------------------ */
+
+@utility btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 2.875rem;
+  padding: 0 1.25rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease-out-soft),
+    color 180ms var(--ease-out-soft),
+    border-color 180ms var(--ease-out-soft),
+    transform 180ms var(--ease-out-soft);
+  &:active {
+    transform: translateY(1px);
+  }
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+}
+
+@utility btn-primary {
+  background: var(--laterite);
+  color: var(--laterite-ink);
+  &:hover {
+    background: color-mix(in oklab, var(--laterite) 86%, var(--ink));
+  }
+}
+
+@utility btn-ink {
+  background: var(--ink);
+  color: var(--paper);
+  &:hover {
+    background: color-mix(in oklab, var(--ink) 82%, var(--laterite));
+  }
+}
+
+@utility btn-outline {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  &:hover {
+    border-color: var(--ink);
+    background: var(--surface);
+  }
+}
+
+@utility link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 220ms var(--ease-out-soft);
+  &:hover {
+    background-size: 100% 1px;
+  }
+}
+
+@utility link-static {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in oklab, currentColor 40%, transparent);
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+@utility field {
+  width: 100%;
+  min-height: 2.875rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
+  &::placeholder {
+    color: color-mix(in oklab, var(--ink-muted) 75%, transparent);
+  }
+  &:hover {
+    border-color: var(--ink-muted);
+  }
+  &:focus {
+    outline: none;
+    border-color: var(--laterite);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--laterite) 18%, transparent);
+  }
+  &[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 0%,
+    color-mix(in oklab, var(--surface-2) 50%, var(--surface)) 50%,
+    var(--surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@utility container-page {
+  width: 100%;
+  max-width: 86rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.75rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Motion — restrained, and off for people who ask for less.
+ * ------------------------------------------------------------------ */
+
+@keyframes rise {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* A line of display text that rises out of its own baseline mask. */
+@utility reveal-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+  & > span {
+    display: inline-block;
+    animation: rise 950ms var(--ease-out-soft) both;
+    animation-delay: var(--d, 0ms);
+  }
+}
+
+@utility fade-up {
+  animation: fade-up 700ms var(--ease-out-soft) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Dual-thumb range: two stacked native inputs, only the thumbs take pointer input. */
+@utility range-thumb {
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+  &::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 100%;
+  }
+  &::-webkit-slider-thumb {
+    appearance: none;
+    pointer-events: auto;
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1.5px solid var(--ink);
+    cursor: grab;
+    transition: transform 150ms;
+  }
+  &::-moz-range-thumb {
+    pointer-events: auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1.5px solid var(--ink);
+    cursor: grab;
+  }
+  &:focus-visible {
+    outline: none;
+  }
+  &:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--laterite);
+    outline-offset: 2px;
+  }
+  &:active::-webkit-slider-thumb {
+    transform: scale(1.12);
+    cursor: grabbing;
+  }
+}
+
+/* A hotel's own accent colour replaces laterite inside its microsite. */
+.brand-scope[style*="--brand"] {
+  --laterite: var(--brand);
+  --laterite-ink: var(--brand-ink);
+}
+[data-theme="dark"] .brand-scope[style*="--brand"] {
+  --laterite: var(--brand-dark);
+  --laterite-ink: var(--brand-dark-ink);
+}
+
+/* A "night" band: always dark, in both themes, with its own local tokens. */
+@utility night {
+  --paper: #1b1a17;
+  --surface: #23201b;
+  --surface-2: #2b2721;
+  --ink: #efe8dc;
+  --ink-muted: #a69d8f;
+  --line: #36312a;
+  --line-strong: #4a4339;
+  --laterite: #e0714b;
+  --laterite-ink: #1b0d08;
+  --brass: #d6a94a;
+  --palm: #6fae8a;
+  --adire: #8ea3c9;
+  --ochre: #e3a04a;
+  background-color: var(--paper);
+  color: var(--ink);
+  color-scheme: dark;
+}
+[data-theme="dark"] .night {
+  --paper: #1e1b16;
+  box-shadow: inset 0 0 0 1px #36312a;
+}
+
+@keyframes swing {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
