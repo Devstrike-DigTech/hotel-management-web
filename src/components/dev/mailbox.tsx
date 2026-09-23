@@ -27,6 +27,7 @@ export interface OutboxMessage {
   html: string | null;
   createdAt: string;
   template: string | null;
+  otpCode: string | null;
 }
 
 /** Accepts the outbox entry in whichever reasonable shape the API uses. */
@@ -42,12 +43,14 @@ function normalise(raw: Record<string, unknown>, i: number): OutboxMessage {
     html: s("html"),
     createdAt: s("createdAt") ?? s("sentAt") ?? new Date().toISOString(),
     template: s("template") ?? s("templateKey"),
+    otpCode: typeof (raw.meta as { otpCode?: unknown } | undefined)?.otpCode === "string" ? ((raw.meta as { otpCode: string }).otpCode) : null,
   };
 }
 
 const OTP_RE = /\b(\d{6})\b/;
-export const findOtp = (m: Pick<OutboxMessage, "text" | "subject">) =>
-  /code|otp|verif/i.test(`${m.subject ?? ""} ${m.text}`) ? (OTP_RE.exec(m.text)?.[1] ?? null) : null;
+/** The sign-in code in a message: the outbox's own field, else six digits in an OTP message. */
+export const findOtp = (m: Pick<OutboxMessage, "text" | "template" | "otpCode">) =>
+  m.otpCode ?? (m.template === "OTP" ? (OTP_RE.exec(m.text)?.[1] ?? null) : null);
 
 const ICON = { EMAIL: EnvelopeSimple, SMS: ChatText, WHATSAPP: WhatsappLogo } as const;
 const LABEL = { EMAIL: "Email", SMS: "SMS", WHATSAPP: "WhatsApp" } as const;

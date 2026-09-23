@@ -46,7 +46,7 @@ export function HotelReviews({ slug, hotelName, initial }: { slug: string; hotel
     }
   }
 
-  if (!summary.count) {
+  if (!summary.count || !initial.total) {
     return (
       <div className="grid gap-4 rounded-sm border border-dashed border-line-strong px-6 py-10 text-center">
         <SealCheck size={30} weight="thin" className="mx-auto text-palm" aria-hidden />
