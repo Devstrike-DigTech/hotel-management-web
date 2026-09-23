@@ -85,10 +85,13 @@ Routing is done in `src/proxy.ts` (Next 16 renamed middleware to proxy; it runs 
 | `{slug}.APP_DOMAIN` | That hotel's microsite |
 | `{slug}.localhost` | That hotel's microsite (local development; browsers resolve `*.localhost` to 127.0.0.1) |
 | Any other host | Looked up with `GET /public/resolve-host?host=...`; a verified custom domain gets its hotel, anything else a 404 |
+| `{group}.APP_DOMAIN` of a hotel group (M5, `kind: GROUP`) | The group's root: `/` lists its hotels, `/{property slug}/...` is that hotel's microsite, other paths redirect to the first hotel |
 | `/h/{slug}/...` on a marketplace host | Path fallback to the microsite, so it works on plain `localhost:3000` |
+| `/g/{group}/...` on a marketplace host | Path fallback to a group's root (M5) |
 
-Hotel hosts are rewritten internally to `/h/{slug}{path}`. The proxy also sets an `x-site-base` request header:
-empty on a hotel's own host, `/h/{slug}` on the path fallback. The microsite builds all of its links from it,
+Hotel hosts are rewritten internally to `/h/{slug}{path}` (group roots to `/g/{group}{path}`). The proxy also sets an
+`x-site-base` request header: empty on a hotel's own host, `/h/{slug}` on the path fallback, `/{slug}` for a hotel shown
+under its group's host (with `x-site-group` saying where the group's root is). The microsite builds all of its links from it,
 so the same pages work under both schemes. Incoming `x-site-base` headers are always stripped on marketplace
 routes, so a client cannot spoof it.
 
@@ -116,7 +119,8 @@ Each microsite has its own `robots.txt`, `sitemap.xml` and OpenGraph card in its
 | `/stays/[slug]/book` | Booking flow (channel `MARKETPLACE`) |
 | `/booking/confirmation` | Paystack return and pay-at-hotel landing: verifies, then the confirmation card |
 | `/h/[slug]`, `/h/[slug]/book`, `/h/[slug]/booking/confirmation` | The same pages as a branded microsite (channel `BOOKING_SITE`) |
-| `/account/sign-in`, `/account/verify`, `/account` | Phone sign-in, emailed sign-in link, profile |
+| `/g/[group]` | A hotel group's root: its hotels, each leading to its own microsite (M5) |
+| `/account/sign-in`, `/account/verify`, `/account`, `/account/points` | Phone sign-in, emailed sign-in link, profile, loyalty points per hotel group (M5) |
 | `/trips`, `/trips/[code]?t=` | Upcoming and past stays; one booking with cancel, documents, review |
 | `/trips/[code]/documents/[kind]/[id]?t=` | Printable invoice or receipt |
 | `/review?t=` | Review a checked-out stay |
@@ -178,13 +182,16 @@ src/
     (marketplace)/            home, stays, hotel page, booking and confirmation, account, trips, review, for-hotels, pricing
     api/v1/[...path]/         same-origin gateway to the backend (guest sessions in httpOnly cookies)
     pay/mock/, dev/           development-only checkout, mailbox and preview
-    h/[slug]/                 hotel microsite (layout, page, book, robots, sitemap, OG)
+    h/[slug]/                 hotel microsite (layout, page, book, robots, sitemap, og.png)
+    g/[group]/                hotel group root (layout, page, robots, sitemap, og.png)
     opengraph-image.tsx, sitemap.ts, robots.ts, not-found.tsx, error.tsx, icon.svg
   components/
     search/                   search bar, city combobox, range calendar, guests, filters
     hotel/                    cards, gallery and lightbox, hotel view, rooms, stay card, JSON-LD
     booking/                  booking flow, hold countdown, confirmation card, payment states
-    account/                  sign-in and code input, trips, trip detail, cancel dialog, documents
+    account/                  sign-in and code input, trips, trip detail, cancel dialog, documents, points
+    loyalty/                  members' card, tier chip, statement, redeem control, points to earn, join (M5)
+    chat/                     "Chat with the hotel on WhatsApp" and the hook that finds a hotel's number (M5)
     reviews/                  guest book, review items, star input, review form
     dev/                      dev mailbox and component preview
     pricing/                  tiers and comparison table
@@ -193,6 +200,7 @@ src/
   lib/
     api.ts, types.ts          typed, server-only client for the public API
     rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
+    loyalty.ts                M5 view models: memberships, statement, the redemption offer
     server/client-ip.ts       the visitor's address and the trusted-proxy headers
     booking-types.ts          M3 contract types
     client-api.ts             browser client: timeouts, retries, idempotency keys, guarded sessionStorage
@@ -432,6 +440,80 @@ so the server says who the visitor is (`src/lib/server/client-ip.ts`):
 | `rates.spec.ts` | Book with a promo code: an expired code is refused precisely and leaves the price alone; WELCOME10 shows its saving, and the discounted total is what the hold, the checkout and the card charge. Book the non-refundable rate on the microsite: the hotel page states both rates' terms and the saving, the card prints non-refundable terms. The review step's non-refundable line and disabled pay-at-hotel. A stay into Detty December: the price calendar shows prices, and the ledger lists each night with its season and the right amounts |
 | `trusted-ip.spec.ts` | Which address is believed (last hop, platform header, normalisation), that the gateway sends `X-Client-IP` and `X-Proxy-Auth` and drops a client's own copies, that nothing is sent without a secret, and that the secret is in no browser bundle |
 
+## Milestone 5: hotel groups, loyalty and WhatsApp
+
+The Pro tier on the guest side. The contract is the backend's `API-M5.md` (sections 1.9, 6.4 and 7).
+
+| A group's own site | "Use N points" at review | Points per hotel group |
+|---|---|---|
+| ![](docs/screenshots/m5-group-1440-light.png) | ![](docs/screenshots/m5-book-points-1440-light.png) | ![](docs/screenshots/m5-account-points-1440-light.png) |
+
+| Group site (phone, dark) | Confirmation: points to earn, WhatsApp | A trip after check-out (phone, dark) | Chat on a Pro hotel's page |
+|---|---|---|---|
+| ![](docs/screenshots/m5-group-390-dark.png) | ![](docs/screenshots/m5-confirmation-1440-light.png) | ![](docs/screenshots/m5-trip-earned-390-dark.png) | ![](docs/screenshots/m5-hotel-whatsapp-1440-dark.png) |
+
+All M5 screens are in [`docs/screenshots/`](docs/screenshots) as `m5-*.png` at 1440 and 390, light and dark, taken against the
+live backend and its M5 seed (the Palmwine House group with Lekki and Ikoyi, "Palmwine Circle"), grain off and quantised.
+The building blocks in every state are on `/dev/preview?only=m5`.
+
+### Hotel groups
+
+- **The group's root.** `{group}.APP_DOMAIN` (the tenant's subdomain) of a group with two or more properties resolves as
+  `kind: GROUP`. Its `/` is the group's register of hotels: the group as masthead, then each property as a numbered entry
+  (plate, place, voice, rating, "from" price) with **Book** and **Visit**, and the group's loyalty programme if it has one.
+  `/g/{group}` is the path fallback, like `/h/{slug}`.
+- **Each hotel keeps its own microsite.** From the group root a hotel links to its canonical address when that is another
+  host (its own subdomain or verified custom domain). Under the group's host, `/{property slug}/...` serves that hotel's
+  microsite too (with `x-site-base: /{slug}`), which is what makes the primary property reachable when the group's host and
+  its subdomain are the same name. Any other path on a group host (an older `/book` link, a Paystack return) is
+  redirected to the first hotel with a 308, query intact. A group of one simply redirects to its hotel.
+- A microsite of a group links back ("Our 2 hotels" in the header, "One of 2 hotels of ..." in the footer).
+- **The marketplace** lists every property on its own; cards, result rows and the hotel page say "Part of The Palmwine House
+  group, 2 hotels".
+- The proxy caches each host's answer (property, or group with its property slugs from `GET /public/groups/:slug`) for five
+  minutes. If the group lookup fails the host still serves its primary property.
+
+### Canonical addresses and custom domains
+
+`HotelDetail.canonicalUrl` (the verified custom domain, else `https://{slug}.APP_DOMAIN`) drives the microsite's
+`<link rel=canonical>`, `og:url`, `metadataBase`, JSON-LD `url`, `sitemap.xml` and the `Sitemap:` line in `robots.txt`,
+whichever host or path the page was reached on. Social cards are `/og.png` routes named on that host (the host proxy serves
+them there); a group root's card lists its hotels. The group root's canonical is `https://{group}.APP_DOMAIN/`, and its
+sitemap lists the root and every hotel at its canonical address.
+
+### Loyalty
+
+- **In the review step**, a signed-in member (the quote's `loyalty.member`) sees their balance with the group and
+  **"Use 3,000 points (₦3,000)"**, the most the stay allows; "Use fewer" opens a slider in steps of 100 from the programme's
+  minimum. Points are applied by re-pricing through `POST /public/quotes` with `redeemPoints` (alongside any promo code),
+  so the ledger's "Palmwine Circle, 3,000 points" line, the total, the hold, Paystack and the card all agree. Refusals
+  (`LOYALTY_REDEMPTION_LIMIT`, `LOYALTY_INSUFFICIENT_POINTS`, `LOYALTY_NOT_MEMBER`) are said plainly and leave the price as
+  it was; if points stop fitting between quote and booking, the stay is re-priced without them and nothing is booked until
+  the guest has seen the new total. The review also says roughly what the stay will earn.
+- **Confirmation and trip** show "You will earn N Palmwine Circle points on this stay", and once the stay is checked out,
+  "You earned N points"; the trips list marks past stays with "+N points".
+- **`/account/points`** (a third account tab) shows one members' card per hotel group: programme and group as letterhead,
+  the tier as a chip in the tier's own colour, the balance and what it is worth, the last twelve months' nights as tally
+  marks struck through in fives up to the next tier, perks, points about to expire, and the member number; beside it the
+  latest statement as a ledger (earned, used, expired, adjusted, reversed; points in palm, balance after each).
+- **Joining**: a signed-in guest's trip page offers "Join Palmwine Circle" when the group lets guests enrol online
+  (`POST /guest/loyalty/enrol`), and shows the balance for members.
+- The gateway sends the guest's token on `public/hotels/:slug/loyalty` too, so it can say whether the guest is a member.
+
+### WhatsApp chat
+
+Hotels with `whatsapp_messaging` (`HotelDetail.whatsapp.available`) get **"Chat with the hotel on WhatsApp"**: a card under
+the stay card and a line in "Finding it" on the hotel page, a card under the confirmation, and a line in the trip's hotel
+panel. It is a plain `wa.me` link (the app on a phone, WhatsApp Web on a computer) with the first message ready:
+"Hello The Palmwine House, this is about my booking PWH-7K3Q9." so the hotel's inbox ties the thread to the reservation.
+Hotels without the feature no longer show a WhatsApp link at all, since nobody would be answering it.
+
+### Tests (M5)
+
+| Spec | What it proves |
+|---|---|
+| `m5.spec.ts` | The group root (`/g/palmwine-house`) lists both hotels in order; Ikoyi's entry opens its microsite and both hotels book on their own sites. The group's own host (`palmwine-house.localhost`) lists them and serves `/{slug}` with the hotel's canonical address. The marketplace shows each property "Part of" the group. A fresh member credited 3,000 points by the hotel (staff API) uses them at review: the ledger, the hold, the mock checkout and the card all carry the lower total, and the balance is 0 afterwards (API and `/account/points`). A member's stay tonight, checked in and out through the staff API, shows the points earned on the trip and in the trips list, and they reach the balance. WhatsApp chat shows on a Pro hotel and not on a Growth one, and the confirmation's and trip's links carry the booking code |
+
 ## Testing
 
 ```bash
@@ -449,6 +531,7 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `review.spec.ts` | Books and pays tonight's stay, checks it in and out through the staff API, then reviews it from the link; a second visit says it was already reviewed |
 | `rates.spec.ts` | M4: promo code booking (saving shown and charged), non-refundable rate (microsite and review step), a Detty December stay priced night by night (see the M4 section) |
 | `trusted-ip.spec.ts` | M4: which visitor address is sent and how, the secret absent from browser bundles, and live per-visitor rate-limit buckets |
+| `m5.spec.ts` | M5: the group root and booking each of its hotels, the group host, "Part of" on the marketplace, redeeming points at booking, points earned after check-out, WhatsApp chat only on Pro hotels (see the M5 section) |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the

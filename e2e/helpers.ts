@@ -110,3 +110,48 @@ export async function staffToken(request: APIRequestContext) {
   expect(res.ok(), `staff login: ${res.status()}`).toBeTruthy();
   return ((await res.json()) as { accessToken: string }).accessToken;
 }
+
+/** Signs in on /account/sign-in with the code from the dev outbox, pasted as SMS autofill does. */
+export async function signInWithOtp(page: Page, phone: string) {
+  await page.goto("/account/sign-in");
+  await page.getByTestId("signin-phone").fill(phone);
+  await page.getByTestId("signin-send").click();
+  await expect(page.getByTestId("otp-0")).toBeVisible();
+  const msg = await outboxFor(page.request, e164(phone), "OTP");
+  const code = msg.meta?.otpCode ?? /\b(\d{6})\b/.exec(msg.text)![1];
+  await page.getByTestId("otp-0").focus();
+  await page.evaluate((c) => {
+    const dt = new DataTransfer();
+    dt.setData("text", c);
+    document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, code);
+  await page.waitForURL(/\/(account|trips)/);
+}
+
+/**
+ * Checks a booked stay in and straight out again as the hotel's front desk (staff API), as a guest
+ * cannot. `propertyId` scopes the staff calls to the stay's property (M5 X-Property-Id).
+ */
+export async function checkInAndOut(
+  request: APIRequestContext,
+  stay: { code: string; roomTypeId: string; checkIn: string; checkOut: string; propertyId?: string },
+) {
+  const token = await staffToken(request);
+  const auth: Record<string, string> = { authorization: `Bearer ${token}`, ...(stay.propertyId ? { "x-property-id": stay.propertyId } : {}) };
+  const list = await (await request.get(`${API}/reservations?q=${stay.code}`, { headers: auth })).json();
+  const res = (list.items as { id: string; code: string }[]).find((r) => r.code === stay.code)!;
+  expect(res, `reservation ${stay.code}`).toBeTruthy();
+  const rooms = await (
+    await request.get(`${API}/availability/rooms?roomTypeId=${stay.roomTypeId}&stayType=NIGHTLY&arrivalDate=${stay.checkIn}&departureDate=${stay.checkOut}&forCheckIn=true`, { headers: auth })
+  ).json();
+  const all = rooms.rooms as { id: string; checkInReady: boolean; free: boolean; reason: string | null }[];
+  const room = all.find((r) => r.checkInReady) ?? all.find((r) => r.free && r.reason === "DIRTY");
+  expect(room, "a room to check into").toBeTruthy();
+  const inRes = await request.post(`${API}/reservations/${res.id}/check-in`, {
+    headers: auth,
+    data: { roomId: room!.id, registerLater: true, ...(room!.checkInReady ? {} : { override: { reason: "E2E test stay" } }) },
+  });
+  expect(inRes.ok(), await inRes.text()).toBeTruthy();
+  const outRes = await request.post(`${API}/reservations/${res.id}/check-out`, { headers: auth, data: {} });
+  expect(outRes.ok(), await outRes.text()).toBeTruthy();
+}
