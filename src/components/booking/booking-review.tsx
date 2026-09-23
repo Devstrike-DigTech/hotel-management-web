@@ -536,7 +536,9 @@ export function BookingReview({
         {quote?.loyalty?.member && quote.loyalty.pointsToEarn > 0 ? (
           <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-muted" data-testid="review-points-to-earn">
             <span aria-hidden className="size-1.5 rotate-45 bg-brass" />
-            This stay earns about <span className="num text-ink">{formatPoints(quote.loyalty.pointsToEarn)}</span> {quote.loyalty.programme} points after check-out.
+            <span>
+              This stay earns about <span className="num text-ink">{formatPoints(quote.loyalty.pointsToEarn)}</span> {quote.loyalty.programme} points after check-out.
+            </span>
           </p>
         ) : null}
         {quote && (quote.cancellationPolicy.nonRefundable || quote.ratePlan?.refundable === false || (plan && isNonRefundable(plan))) ? (

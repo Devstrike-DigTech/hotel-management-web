@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { GuestMembership } from "@/lib/booking-types";
 import { call, ClientApiError, humanError } from "@/lib/client-api";
+import { groupLabel } from "@/lib/format";
 import { membershipView, statementView } from "@/lib/loyalty";
 import { Notice } from "../ui/field";
 import { PointsCard } from "../loyalty/points-card";
@@ -72,7 +73,7 @@ export function PointsView() {
                     <PointsStatement entries={m.recent.map(statementView)} programmeName={m.programme} />
                   </div>
                   <p className="mt-5 text-sm text-ink-muted">
-                    Use your points when you book any {m.group.name} hotel while signed in: the review step offers them.
+                    Use your points on a stay at any hotel of {groupLabel(m.group.name)}: book while signed in, and the review step offers them.
                   </p>
                 </div>
               </section>

@@ -163,7 +163,7 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
             />
           ) : null}
 
-          {signedIn && b.status !== "CANCELLED" ? <JoinProgramme hotelSlug={b.hotel.slug} hotelName={b.hotel.name} /> : null}
+          {signedIn && b.status !== "CANCELLED" ? <JoinProgramme hotelSlug={b.hotel.slug} hotelName={b.hotel.name} showMember={!b.loyalty} /> : null}
 
           {b.review.eligible && b.review.token && !b.review.submitted ? (
             <section className="rounded-md border border-brass/50 bg-brass/[0.06] p-5">

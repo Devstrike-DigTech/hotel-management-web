@@ -11,7 +11,7 @@ import type { HotelLoyalty } from "@/lib/types";
  * Joining a hotel group's programme from a booking, for a signed-in guest who is not a member yet
  * (M5 `POST /guest/loyalty/enrol`). Shows the balance instead for members; nothing without a programme.
  */
-export function JoinProgramme({ hotelSlug, hotelName }: { hotelSlug: string; hotelName: string }) {
+export function JoinProgramme({ hotelSlug, hotelName, showMember = true }: { hotelSlug: string; hotelName: string; showMember?: boolean }) {
   const [info, setInfo] = useState<HotelLoyalty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +28,7 @@ export function JoinProgramme({ hotelSlug, hotelName }: { hotelSlug: string; hot
   const p = info?.programme;
   if (!p) return null;
 
+  if (info.member && !joined && !showMember) return null;
   if (info.member || joined)
     return (
       <p className="flex items-start gap-2.5 rounded-md border border-line bg-surface p-4 text-sm" data-testid="programme-member">

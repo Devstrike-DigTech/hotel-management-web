@@ -125,7 +125,8 @@ export async function signInWithOtp(page: Page, phone: string) {
     dt.setData("text", c);
     document.activeElement!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   }, code);
-  await page.waitForURL(/\/(account|trips)/);
+  // Signed in once the page leaves the sign-in form (for the profile or trips).
+  await page.waitForURL((u) => /^\/(account|trips)/.test(u.pathname) && !u.pathname.startsWith("/account/sign-in"));
 }
 
 /**

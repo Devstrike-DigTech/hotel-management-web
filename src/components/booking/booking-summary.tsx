@@ -74,7 +74,9 @@ export function BookingSummary({
             </div>
             {price.discountKobo > 0 ? (
               <div className="flex justify-between gap-4 text-palm" data-testid="summary-discount">
-                <dt className="font-sans [font-variant-numeric:normal]">{quote?.promo ? `Promo ${quote.promo.code}` : "Discount"}</dt>
+                <dt className="font-sans [font-variant-numeric:normal]">
+                  {quote?.promo && quote.loyalty?.pointsRedeemed ? `Promo ${quote.promo.code} and points` : quote?.promo ? `Promo ${quote.promo.code}` : quote?.loyalty?.pointsRedeemed ? `${quote.loyalty.programme} points` : "Discount"}
+                </dt>
                 <dd>&minus;{formatNaira(price.discountKobo)}</dd>
               </div>
             ) : null}
