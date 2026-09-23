@@ -114,11 +114,11 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
         {hotel.searchAvailability ? (
           <div className="md:text-right" data-testid="result-price">
             <p className="kicker">
-              {hotel.searchAvailability.nights} {hotel.searchAvailability.nights === 1 ? "night" : "nights"}, all in
+              {hotel.searchAvailability.nights} {hotel.searchAvailability.nights === 1 ? "night" : "nights"}, all in, from
             </p>
             <Money kobo={hotel.searchAvailability.cheapestTotalKobo} className="mt-1 block text-2xl font-medium text-ink" />
             <p className="mt-0.5 text-xs text-ink-muted">
-              <Money kobo={hotel.searchAvailability.cheapestRateKobo} /> a night, taxes included in total
+              <Money kobo={hotel.searchAvailability.cheapestRateKobo} /> a night{hotel.searchAvailability.nights > 1 ? " on average" : ""}, before taxes
             </p>
             <p className="kicker mt-2.5 inline-flex items-center gap-1.5 !text-palm">
               <span aria-hidden className="size-1.5 rounded-full bg-palm" />

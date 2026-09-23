@@ -339,6 +339,86 @@ forwards only `public/*` and `guest/*` routes:
   picked out with a copy button, HTML emails in a sandboxed iframe (`sandbox=""`: no scripts, no forms).
 - `/dev/preview`: the M3 building blocks (card, countdown states, code input, payment states, review item).
 
+## Milestone 4: rates, seasons and promo codes
+
+Prices now move with the calendar. The contract is the backend's `API-M4.md` (sections 0 and 5.2, 6).
+
+<!-- M4 screenshots -->
+
+### Rate plans
+
+- **The hotel page** lists each room type's rates as a small ledger under the room when it sells more than one:
+  "Flexible" (the hotel's Best Available Rate, renamed for guests) and "Non-refundable", each with its marks
+  (free cancellation or non-refundable, breakfast included, "10% off"), the cancellation terms in one short
+  sentence, the stay's total and what it saves against the flexible rate, and its own "Choose" link
+  (`/book?room=&plan=`). The room's own price reads **"from"** the cheapest rate: without dates the lowest
+  nightly price the hotel publishes for the next 60 days, with dates the cheapest stay across its rates.
+- **Booking step one** adds the rate choice as two cards, with the difference said plainly: the flexible rate
+  names the exact free-cancellation deadline; the non-refundable one says the whole stay is paid when booking
+  and nothing is refunded. The chosen rate travels as `ratePlanId` into the quote (and so into the quote token).
+- **Non-refundable** at review: a lock line in place of the free-cancellation line, and pay at the hotel is
+  switched off (the quote's own payment options say why). The confirmation card names the rate and prints the
+  non-refundable terms.
+- Availability calls send the booking `channel` (marketplace or the hotel's own site), so the rates and prices
+  shown are the ones the booking will charge.
+
+### Nightly prices by date
+
+- Every night is priced on its own (weekends, seasons such as Detty December, single-date overrides). When the
+  nights differ, the review ledger opens to list each night with its date, its season as a brass tag and its
+  price; the side summary and the room cards show a range ("₦85,000 to ₦114,750 a night").
+- **The price calendar**: once a hotel is chosen (its page's date field and booking step one), each day in the
+  picker carries the cheapest nightly price for the party, from `GET /public/hotels/:slug/price-calendar`.
+  The month's lowest price is set in palm; **closed-to-arrival** days are hatched and cannot start a stay (you
+  can still stay through them); full nights are struck through; closed-to-departure days cannot end a stay;
+  the **minimum stay** for an arrival day is said under the grid while choosing and enforced on the check-out.
+  Tapping a day that cannot be used says why instead of doing nothing. Screen readers hear the price, the season
+  and any restriction in each day's label.
+- It degrades quietly: skeleton bars while prices load (fetched per visible span, within the API's 62-day window,
+  and kept for the page's life), a one-line notice if they fail (the dates still work and the room list prices
+  them), a retry when the phone comes back online, and no prices at all against an API without the endpoint.
+
+### Promo codes
+
+- In the review step, behind a quiet "Have a promo code?". The code is checked by re-pricing the stay with it
+  (`POST /public/quotes` with `promoCode`), so the saving shown is exactly what the quote token charges; a refused
+  code leaves the price as it was.
+- Applied: the code in a palm chip, "You save ₦26,350", a "Promo WELCOME10" line in the ledger and a saving line
+  under the total, and a Remove link. The discount follows the booking onto the hold, Paystack and the card.
+- Refused: one precise sentence per `PROMO_INVALID` reason and, where there is one, the way forward: expired
+  (with the date), not valid for these dates (with the stay window), too few nights ("needs at least 4 nights;
+  yours is 2. Add 2 nights in step one"), used up, already used by this number, first stay only, wrong room
+  type, not sold here, or no saving on this rate. If a code stops working between the quote and the booking
+  (the last use went), the guest is told, the stay is re-priced without it, and nothing is booked until they
+  have seen the new total.
+- Restrictions met at quote or booking time (`STAY_RESTRICTED`, `RATE_PLAN_UNAVAILABLE`) send the guest back to
+  step one with the reason in words ("The hotel takes no arrivals on Thu 24 Dec").
+
+### Trusted client address
+
+The backend limits public routes per IP. Every call this app makes to the backend comes from its own server,
+so the server says who the visitor is (`src/lib/server/client-ip.ts`):
+
+- `X-Client-IP`: the visitor's address, and `X-Proxy-Auth`: `TRUSTED_PROXY_SECRET`. The backend believes the
+  first only when the second matches (constant-time compare); anyone else's `X-Client-IP` is ignored.
+- Which address: the header named by `CLIENT_IP_HEADER` if your host sets one clients cannot forge
+  (`cf-connecting-ip`, `x-vercel-forwarded-for`); otherwise the **last** `X-Forwarded-For` hop, the one your own
+  edge proxy appended (earlier hops are whatever the client claimed); otherwise `X-Real-IP`. Ports, brackets and
+  IPv4-mapped IPv6 are normalised and anything that is not an address is dropped.
+- Sent by the `/api/v1` gateway (every browser call, and the refresh and sign-out calls it makes), by uncached
+  server-side fetches, and by the host proxy's `resolve-host` lookup. Cached server fetches are shared by every
+  visitor (and Next keys its data cache on request headers), so they carry the credential without an address.
+- The secret is a server-only variable (never `NEXT_PUBLIC_`), so it is not inlined into any browser bundle; a
+  Playwright test fetches every script a page loads and checks. Client copies of both headers are stripped by
+  `src/proxy.ts` and never copied by the gateway. Without a secret nothing is sent.
+
+### Tests (M4)
+
+| Spec | What it proves |
+|---|---|
+| `rates.spec.ts` | Book with a promo code: an expired code is refused precisely and leaves the price alone; WELCOME10 shows its saving, and the discounted total is what the hold, the checkout and the card charge. Book the non-refundable rate on the microsite: the hotel page states both rates' terms and the saving, the card prints non-refundable terms. The review step's non-refundable line and disabled pay-at-hotel. A stay into Detty December: the price calendar shows prices, and the ledger lists each night with its season and the right amounts |
+| `trusted-ip.spec.ts` | Which address is believed (last hop, platform header, normalisation), that the gateway sends `X-Client-IP` and `X-Proxy-Auth` and drops a client's own copies, that nothing is sent without a secret, and that the secret is in no browser bundle |
+
 ## Testing
 
 ```bash
