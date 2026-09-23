@@ -11,6 +11,7 @@ import type {
   HotelCard,
   HotelDetail,
   HotelGroup,
+  HotelLoyalty,
   HotelQuery,
   Paginated,
   Plan,
@@ -119,6 +120,15 @@ export const api = {
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;
+    }
+  },
+  /** M5: a hotel's loyalty programme (public view, no member); null without one or before M5. */
+  loyalty: async (slug: string): Promise<HotelLoyalty["programme"]> => {
+    try {
+      const r = await request<HotelLoyalty>(`/public/hotels/${encodeURIComponent(slug)}/loyalty`, { revalidate: 120, tags: [`loyalty:${slug}`] });
+      return r.programme;
+    } catch {
+      return null;
     }
   },
   resolveHost: async (host: string): Promise<ResolvedHost | null> => {

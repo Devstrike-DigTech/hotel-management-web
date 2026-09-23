@@ -61,8 +61,9 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
           </Link>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Link href={`${base}#hotels`} className="btn btn-primary ml-1 !min-h-10 !px-4 text-sm">
-              Choose a hotel
+            <Link href={`${base}#hotels`} className="btn btn-primary ml-1 !min-h-10 !px-3 text-sm sm:!px-4">
+              <span className="sm:hidden">Hotels</span>
+              <span className="hidden sm:inline">Choose a hotel</span>
             </Link>
           </div>
         </div>

@@ -561,6 +561,24 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
 - The trusted headers only take effect once the backend's `.env` has the same `TRUSTED_PROXY_SECRET` (16 characters or
   more) as this app's.
 
+## Contract notes (M5)
+
+- Group roots, `canonicalUrl`, `whatsapp`, `group`, `/public/groups/:slug`, `resolve-host` (`kind`, `groupSlug`), the quote's
+  `redeemPoints` and `loyalty` block, `BookingView.loyalty`, `TripSummary.pointsEarned`, `/guest/loyalty`, enrolment and
+  `/public/hotels/:slug/loyalty` match `API-M5.md` against the live backend.
+- The group's name is the tenant's name, which for the demo is the same as its first hotel ("The Palmwine House"). The web
+  says "Part of The Palmwine House group" so it does not read as the hotel being part of itself.
+- A group root is served on the tenant's subdomain, which is also the primary property's subdomain (`palmwine-house`). So
+  that the primary property stays reachable there, hotels are served under the group host at `/{slug}`; the primary
+  property's `canonicalUrl` still names that same host, so the group root links to it at `/palmwine-house`.
+- The review step needs the programme's point value and minimum, which the quote does not carry; it reads them from
+  `/public/hotels/:slug/loyalty` once the quote says the guest is a member. The quote's `maxRedeemablePoints` is taken as
+  the cap (with the balance), and "use fewer" moves in steps of 100.
+- The BRIEF asks for WhatsApp chat on the hotel page and trip detail; it is also on the confirmation. Only `whatsapp.available`
+  hotels show it, so the earlier "Message on WhatsApp" link to the front-desk phone is gone for other hotels.
+- The backend's own test run replaces the seeded custom domains (Lekki's `book.thepalmwinehouse.com` was gone and Ikoyi had a
+  test domain at the time of the screenshots); the web simply follows `canonicalUrl`, whatever it is.
+
 ## Not done yet
 
 - Paystack Inline (the popup, using `accessCode`) is not used; the flow redirects to the hosted checkout, which

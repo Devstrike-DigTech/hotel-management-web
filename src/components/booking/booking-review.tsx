@@ -717,11 +717,12 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
         ) : null}
         {pointsKobo > 0 ? (
           <div className="flex items-baseline gap-3 text-palm" data-testid="points-line">
-            <dt className="inline-flex items-center gap-1.5 font-sans [font-variant-numeric:normal]">
-              <span aria-hidden className="mx-[3px] size-2 rotate-45 border border-current" /> {quote.loyalty?.programme ?? "Points"}, <span className="num">{formatPoints(quote.loyalty?.pointsRedeemed ?? 0)}</span> points
+            <dt className="font-sans [font-variant-numeric:normal]">
+              <span aria-hidden className="mr-2 inline-block size-2 rotate-45 border border-current align-[1px]" />
+              {quote.loyalty?.programme ?? "Points"}, <span className="num whitespace-nowrap">{formatPoints(quote.loyalty?.pointsRedeemed ?? 0)} points</span>
             </dt>
             <span aria-hidden className="leader" />
-            <dd>&minus;{formatNaira(pointsKobo)}</dd>
+            <dd className="whitespace-nowrap">&minus;{formatNaira(pointsKobo)}</dd>
           </div>
         ) : null}
         {b.taxes.map((t) => (
