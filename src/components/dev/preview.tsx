@@ -9,6 +9,7 @@ import { ReviewItem } from "@/components/reviews/review-parts";
 import { StarInput } from "@/components/reviews/stars";
 import { APP_NAME } from "@/lib/env";
 import type { ISODate } from "@/lib/dates";
+import { PreviewM5 } from "./preview-m5";
 import { PreviewRates } from "./preview-rates";
 
 const SAMPLE: ConfirmationData = {
@@ -59,6 +60,7 @@ export function Preview({ only, today }: { only?: string; today: ISODate }) {
 
   return (
     <div className="container-page space-y-20 py-12">
+      {show("m5") ? <PreviewM5 /> : null}
       {show("rates") ? <PreviewRates today={today} /> : null}
       {show("card") ? (
         <section className="space-y-10">
