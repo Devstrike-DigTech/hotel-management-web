@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { HotelView } from "@/components/hotel/hotel-view";
 import { HotelJsonLd } from "@/components/hotel/json-ld";
 import { normaliseStay, todayInLagos } from "@/lib/dates";
-import { getHotel, siteBase } from "@/lib/site";
+import { canonicalSite, getHotel, siteBase } from "@/lib/site";
 import { api, settle } from "@/lib/api";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -18,7 +18,7 @@ export default async function MicrositeHome({ params, searchParams }: PageProps<
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
   return (
     <>
-      <HotelJsonLd hotel={hotel} path={base || "/"} />
+      <HotelJsonLd hotel={hotel} path={`${await canonicalSite(hotel)}/`} />
       <HotelView
         hotel={hotel}
         reviews={reviews.data}

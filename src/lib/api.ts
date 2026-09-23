@@ -10,9 +10,11 @@ import type {
   Feature,
   HotelCard,
   HotelDetail,
+  HotelGroup,
   HotelQuery,
   Paginated,
   Plan,
+  ResolvedHost,
 } from "./types";
 
 /** Typed client for the public API. Server-only: pages fetch on the server for SEO. */
@@ -110,9 +112,18 @@ export const api = {
       revalidate: 60,
       tags: ["reviews", `reviews:${slug}`],
     }),
-  resolveHost: async (host: string): Promise<{ slug: string } | null> => {
+  /** M5: a hotel group and its properties; null when unknown (404, or an API from before M5). */
+  group: async (slug: string): Promise<HotelGroup | null> => {
     try {
-      return await request<{ slug: string }>(`/public/resolve-host${qs({ host })}`, { revalidate: false, timeoutMs: 3000 });
+      return await request<HotelGroup>(`/public/groups/${encodeURIComponent(slug)}`, { revalidate: 60, tags: ["hotels", `group:${slug}`] });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+  resolveHost: async (host: string): Promise<ResolvedHost | null> => {
+    try {
+      return await request<ResolvedHost>(`/public/resolve-host${qs({ host })}`, { revalidate: false, timeoutMs: 3000 });
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) return null;
       throw err;

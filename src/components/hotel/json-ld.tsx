@@ -8,7 +8,7 @@ export function HotelJsonLd({ hotel, path }: { hotel: HotelDetail; path: string 
     "@type": "Hotel",
     name: hotel.name,
     description: hotel.tagline,
-    url: `${SITE_URL}${path}`,
+    url: /^https?:/.test(path) ? path : `${SITE_URL}${path}`,
     image: hotel.images.map((i) => i.url).slice(0, 5),
     telephone: hotel.phone ?? undefined,
     email: hotel.email ?? undefined,

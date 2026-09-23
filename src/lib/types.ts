@@ -63,6 +63,53 @@ export interface HotelCard {
   onlineBookingEnabled?: boolean;
   freeCancellationHours?: number;
   searchAvailability?: SearchAvailability | null;
+  /* M5, additive: the hotel group, when it has two or more properties. */
+  group?: GroupRef | null;
+}
+
+/** M5: a hotel group (the tenant). `slug` is the tenant slug; `name` the group's name. */
+export interface GroupRef {
+  slug: string;
+  name: string;
+  propertyCount: number;
+}
+
+/** M5: guest WhatsApp messaging (Pro, `whatsapp_messaging`). */
+export interface HotelWhatsApp {
+  available: boolean;
+  phone: string | null;
+  waUrl: string | null;
+}
+
+/** M5: `GET /public/groups/:slug`. */
+export interface HotelGroup {
+  slug: string;
+  name: string;
+  branding: { accentColor: string | null; logoUrl: string | null };
+  propertyCount: number;
+  properties: (HotelCard & { canonicalUrl: string })[];
+}
+
+/** M5: `GET /public/hotels/:slug/loyalty`. */
+export interface HotelLoyalty {
+  programme: {
+    name: string;
+    earnPointsPer1000: number;
+    pointValueKobo: number;
+    minRedeemPoints: number;
+    maxRedeemBps: number;
+    tiers: { name: string; minNights: number; perks: string[]; color: string }[];
+    enrolOnline: boolean;
+  } | null;
+  member: { memberNo: string; points: number; valueKobo: number; tier: string | null } | null;
+}
+
+/** M5: `GET /public/resolve-host`. `kind` and friends are absent on an older backend. */
+export interface ResolvedHost {
+  slug: string;
+  kind?: "PROPERTY" | "GROUP";
+  groupSlug?: string;
+  canonicalHost?: string;
 }
 
 export interface ImageRef {
@@ -102,6 +149,9 @@ export interface HotelDetail extends HotelCard {
   mapUrl?: string;
   booking?: HotelBookingInfo;
   reviewSummary?: ReviewSummary;
+  /* M5 */
+  canonicalUrl?: string;
+  whatsapp?: HotelWhatsApp;
 }
 
 export interface Paginated<T> {

@@ -73,3 +73,8 @@ export function roman(n: number) {
 export function placeName(city: string, state: string) {
   return city.toLowerCase() === state.toLowerCase() ? city : `${city}, ${state}`;
 }
+
+/** "The Palmwine House" -> "The Palmwine House group"; a name that already says so is left alone. */
+export function groupLabel(name: string) {
+  return /\b(group|hotels|collection)$/i.test(name.trim()) ? name.trim() : `${name.trim()} group`;
+}

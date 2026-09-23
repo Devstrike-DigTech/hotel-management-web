@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "@phosphor-icons/react/ssr";
 import type { HotelCard as Hotel } from "@/lib/types";
-import { placeName } from "@/lib/format";
+import { groupLabel, placeName } from "@/lib/format";
 import { AmenityIcon } from "../ui/amenity";
 import { Money } from "../ui/money";
 import { Plate } from "../ui/plate";
@@ -51,6 +51,7 @@ export function HotelCard({ hotel, plate, size = "md", priority, query = "", asp
             </Link>
           </h3>
           <p className="mt-1.5 line-clamp-2 font-display text-[1.02rem] italic leading-snug text-ink-muted">{hotel.tagline}</p>
+          <PartOf hotel={hotel} />
         </div>
         <ArrowUpRight
           size={20}
@@ -98,6 +99,7 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
           </Link>
         </h2>
         <p className="mt-1 font-display text-[1.05rem] italic text-ink-muted">{hotel.tagline}</p>
+        <PartOf hotel={hotel} />
         <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2" aria-label="Amenities">
           {hotel.amenities.slice(0, 6).map((a) => (
             <li key={a} className="flex items-center gap-1.5 text-[0.8125rem] text-ink-muted">
@@ -142,5 +144,22 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
         </div>
       </div>
     </article>
+  );
+}
+
+/** "Part of The Palmwine House group", for a property whose group has more than one hotel. */
+export function PartOf({ hotel, className = "mt-2.5" }: { hotel: Pick<Hotel, "group">; className?: string }) {
+  if (!hotel.group || hotel.group.propertyCount < 2) return null;
+  return (
+    <p className={`flex items-center gap-2 text-[0.8125rem] text-ink-muted ${className}`} data-testid="part-of-group">
+      <svg viewBox="0 0 12 12" className="size-3 shrink-0 text-brass" aria-hidden>
+        <path d="M6 1 11 6 6 11 1 6Z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M6 4 8 6 6 8 4 6Z" fill="currentColor" />
+      </svg>
+      <span>
+        Part of <span className="text-ink">{groupLabel(hotel.group.name)}</span>
+        <span className="num"> &middot; {hotel.group.propertyCount} hotels</span>
+      </span>
+    </p>
   );
 }

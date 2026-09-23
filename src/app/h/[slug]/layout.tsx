@@ -3,41 +3,28 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowUpRight, Phone } from "@phosphor-icons/react/ssr";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Monogram } from "@/components/ui/monogram";
 import { KeyFob } from "@/components/ui/wordmark";
 import { brandStyle } from "@/lib/brand";
 import { APP_NAME, SITE_URL } from "@/lib/env";
 import { formatPhone, toE164Digits } from "@/lib/format";
-import { getHotel, siteBase, siteOrigin } from "@/lib/site";
+import { canonicalSite, getHotel, groupRootHref, siteBase } from "@/lib/site";
 
 export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const hotel = await getHotel(slug).catch(() => null);
   if (!hotel) return { title: "Hotel not found" };
-  const origin = await siteOrigin(slug);
+  // The hotel's canonical address (its verified custom domain, else its subdomain), however this copy was reached.
+  const canonical = await canonicalSite(hotel);
+  const description = `${hotel.tagline}. Book direct with ${hotel.name} in ${hotel.area}, ${hotel.city}.`;
   return {
-    metadataBase: new URL(origin.replace(/\/h\/[^/]+$/, "") || SITE_URL),
+    metadataBase: new URL(new URL(canonical).origin || SITE_URL),
     title: { default: `${hotel.name}, ${hotel.area}`, template: `%s — ${hotel.name}` },
-    description: `${hotel.tagline}. Book direct with ${hotel.name} in ${hotel.area}, ${hotel.city}.`,
+    description,
     applicationName: hotel.name,
-    openGraph: { siteName: hotel.name, title: hotel.name, description: hotel.tagline, type: "website", locale: "en_NG" },
+    alternates: { canonical: `${canonical}/` },
+    openGraph: { siteName: hotel.name, title: hotel.name, description: hotel.tagline, url: `${canonical}/`, type: "website", locale: "en_NG" },
   };
-}
-
-function Monogram({ name }: { name: string }) {
-  const letters = name
-    .replace(/^the\s+/i, "")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-  return (
-    <span className="grid size-10 shrink-0 place-items-center rounded-full border border-laterite text-laterite">
-      <span className="font-display text-[15px] italic" style={{ fontVariationSettings: '"opsz" 36, "SOFT" 100, "WONK" 1' }}>
-        {letters}
-      </span>
-    </span>
-  );
 }
 
 export default async function MicrositeLayout({ children, params }: LayoutProps<"/h/[slug]">) {
@@ -48,6 +35,8 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
   const home = base || "/";
   const anchor = (id: string) => (base ? `${base}#${id}` : `/#${id}`);
   const phone = hotel.phone ? toE164Digits(hotel.phone) : null;
+  const group = hotel.group && hotel.group.propertyCount > 1 ? hotel.group : null;
+  const groupHref = group ? await groupRootHref(slug, group.slug) : null;
 
   return (
     <div className="brand-scope flex min-h-dvh flex-col" style={brandStyle(hotel.branding.accentColor)}>
@@ -84,6 +73,13 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
                   Finding us
                 </Link>
               </li>
+              {group && groupHref ? (
+                <li>
+                  <a href={groupHref} className="link text-ink/85 hover:text-ink" data-testid="group-link">
+                    Our {group.propertyCount} hotels
+                  </a>
+                </li>
+              ) : null}
             </ul>
           </nav>
           <div className="flex items-center gap-1">
@@ -111,6 +107,14 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
             <div>
               <p className="display-sm text-2xl">{hotel.name}</p>
               <p className="mt-2 font-display italic text-ink-muted">{hotel.tagline}</p>
+              {group && groupHref ? (
+                <p className="mt-4 text-[0.9375rem] text-ink-muted">
+                  One of {group.propertyCount} hotels of {group.name}.{" "}
+                  <a href={groupHref} className="link-static text-ink">
+                    See them all
+                  </a>
+                </p>
+              ) : null}
             </div>
             <address className="text-[0.9375rem] not-italic leading-relaxed text-ink-muted">
               {hotel.address || `${hotel.area}, ${hotel.city}`}
