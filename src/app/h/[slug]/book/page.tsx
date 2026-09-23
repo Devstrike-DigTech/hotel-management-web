@@ -21,6 +21,8 @@ export default async function MicrositeBook({ params, searchParams }: PageProps<
       hotel={hotel}
       today={today}
       hotelHref={base || "/"}
+      channel="BOOKING_SITE"
+      confirmPath={`${base}/booking/confirmation`}
       initial={{ room: one(sp.room) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
     />
   );

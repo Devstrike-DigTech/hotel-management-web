@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { BookingPage } from "@/components/booking/booking-page";
 import { api } from "@/lib/api";
 import { normaliseStay, todayInLagos } from "@/lib/dates";
@@ -16,6 +16,12 @@ export default async function BookPage({ params, searchParams }: PageProps<"/sta
   const sp = await searchParams;
   const hotel = await api.hotel(slug);
   if (!hotel) notFound();
+  // A hotel that is not on the marketplace takes bookings only on its own site (channel BOOKING_SITE).
+  if (hotel.booking && !hotel.booking.marketplaceListed) {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (typeof v === "string") q.set(k, v);
+    redirect(`/h/${hotel.slug}/book${q.size ? `?${q}` : ""}`);
+  }
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
   return (
@@ -23,6 +29,8 @@ export default async function BookPage({ params, searchParams }: PageProps<"/sta
       hotel={hotel}
       today={today}
       hotelHref={`/stays/${hotel.slug}`}
+      channel="MARKETPLACE"
+      confirmPath="/booking/confirmation"
       initial={{ room: one(sp.room) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
     />
   );
