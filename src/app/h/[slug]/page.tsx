@@ -3,6 +3,7 @@ import { HotelView } from "@/components/hotel/hotel-view";
 import { HotelJsonLd } from "@/components/hotel/json-ld";
 import { normaliseStay, todayInLagos } from "@/lib/dates";
 import { getHotel, siteBase } from "@/lib/site";
+import { api, settle } from "@/lib/api";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -11,6 +12,7 @@ export default async function MicrositeHome({ params, searchParams }: PageProps<
   const sp = await searchParams;
   const hotel = await getHotel(slug);
   if (!hotel) notFound();
+  const reviews = await settle(api.reviews(hotel.slug, { pageSize: 6 }));
   const base = await siteBase(slug);
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
@@ -19,6 +21,7 @@ export default async function MicrositeHome({ params, searchParams }: PageProps<
       <HotelJsonLd hotel={hotel} path={base || "/"} />
       <HotelView
         hotel={hotel}
+        reviews={reviews.data}
         today={today}
         initial={{ ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
         bookBase={`${base}/book`}

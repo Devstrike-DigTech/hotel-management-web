@@ -7,6 +7,7 @@ import {
   SignIn,
   SignOut,
   WhatsappLogo,
+  ShieldCheck,
 } from "@phosphor-icons/react/ssr";
 import type { HotelDetail } from "@/lib/types";
 import type { ISODate } from "@/lib/dates";
@@ -14,11 +15,14 @@ import { formatClock, formatPhone, placeName, roman, toE164Digits } from "@/lib/
 import { AmenityIcon } from "../ui/amenity";
 import { Gallery } from "./gallery";
 import { Rating } from "./rating";
+import { HotelReviews } from "../reviews/hotel-reviews";
+import type { CancellationPolicy, ReviewPage } from "@/lib/booking-types";
 import { RoomList } from "./room-list";
 import { MobileBookBar, StayCard, StayProvider } from "./stay-context";
 
 interface Props {
   hotel: HotelDetail;
+  reviews: ReviewPage | null;
   today: ISODate;
   initial: { checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
   bookBase: string;
@@ -26,7 +30,8 @@ interface Props {
 }
 
 /** The hotel page, shared by the marketplace (/stays/[slug]) and the hotel's own microsite. */
-export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
+export function HotelView({ hotel, reviews, today, initial, bookBase, variant }: Props) {
+  const policy = hotel.booking?.cancellationPolicy ?? null;
   const images = hotel.images.length
     ? hotel.images
     : hotel.coverImageUrl
@@ -38,7 +43,7 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
   const from = hotel.startingRateKobo ?? minRoom;
 
   return (
-    <StayProvider initial={initial} today={today} bookBase={bookBase}>
+    <StayProvider initial={initial} today={today} bookBase={bookBase} slug={hotel.slug}>
       <div className="container-page pb-16 pt-8 lg:pb-0 lg:pt-10">
         {variant === "marketplace" ? (
           <nav aria-label="Breadcrumb" className="kicker flex flex-wrap items-center gap-2">
@@ -165,9 +170,27 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
               </div>
             </section>
 
+            {/* Reviews */}
+            <section id="reviews" aria-labelledby="reviews-title" className="mt-14 scroll-mt-28">
+              <SectionHead
+                n={4}
+                id="reviews-title"
+                title="Guest book"
+                aside={reviews?.summary.count ? `${reviews.summary.count} verified ${reviews.summary.count === 1 ? "stay" : "stays"}` : undefined}
+              />
+              <div className="mt-6">
+                {reviews ? (
+                  <HotelReviews slug={hotel.slug} hotelName={hotel.name} initial={reviews} />
+                ) : (
+                  <p className="text-ink-muted">Reviews could not be loaded just now.</p>
+                )}
+              </div>
+            </section>
+
             {/* Policies */}
             <section aria-labelledby="rules-title" className="mt-14">
-              <SectionHead n={4} id="rules-title" title="House rules" />
+              <SectionHead n={5} id="rules-title" title="House rules and cancellation" />
+              {policy ? <CancellationCard policy={policy} /> : null}
               <div className="mt-6 grid gap-8 md:grid-cols-[1fr_15rem]">
                 {hotel.policies.length ? (
                   <ol className="space-y-4">
@@ -200,7 +223,7 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
 
             {/* Location */}
             <section id="location" aria-labelledby="where-title" className="mt-14 scroll-mt-28">
-              <SectionHead n={5} id="where-title" title="Finding it" />
+              <SectionHead n={6} id="where-title" title="Finding it" />
               <div className="mt-6 grid gap-6 rounded-sm border border-line bg-surface p-6 sm:grid-cols-2">
                 <address className="not-italic">
                   <p className="display-sm text-xl">{hotel.name}</p>
@@ -244,13 +267,44 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
 
           <aside aria-label="Plan your stay" className="lg:col-span-4">
             <div className="lg:sticky lg:top-24">
-              <StayCard fromKobo={from} phone={hotel.phone} />
+              <StayCard fromKobo={from} phone={hotel.phone} cancellationSummary={policy?.summary} />
             </div>
           </aside>
         </div>
       </div>
       <MobileBookBar fromKobo={from} />
     </StayProvider>
+  );
+}
+
+/** The cancellation policy as a three-step timeline: free, then a fee, then a no-show. */
+function CancellationCard({ policy }: { policy: CancellationPolicy }) {
+  const fee = policy.lateCancellationFeePct;
+  const feeText = fee >= 100 ? "the first night" : fee > 0 ? `${fee}% of the first night` : "nothing";
+  const noShow = policy.noShowFeePct >= 100 ? "the first night" : policy.noShowFeePct > 0 ? `${policy.noShowFeePct}% of the first night` : "nothing";
+  const steps = [
+    { k: "Free", body: policy.freeCancellationHours > 0 ? `Cancel up to ${policy.freeCancellationHours} hours before check-in and pay nothing. Paid online? It all comes back.` : "Cancellation is not free for this hotel; see below.", tone: "bg-palm" },
+    { k: "Late", body: `Within ${policy.freeCancellationHours} hours of check-in, cancelling costs ${feeText}. The rest is refunded.`, tone: "bg-ochre" },
+    { k: "No-show", body: `If you do not arrive, the hotel may charge ${noShow}.`, tone: "bg-danger" },
+  ];
+  return (
+    <div className="mt-6 rounded-sm border border-line bg-surface p-5 sm:p-6" data-testid="cancellation-policy">
+      <p className="flex items-center gap-2 text-[0.9375rem] font-medium">
+        <ShieldCheck size={19} weight="light" className="text-palm" aria-hidden /> {policy.summary}
+      </p>
+      <ol className="mt-5 grid gap-5 sm:grid-cols-3 sm:gap-0">
+        {steps.map((s, i) => (
+          <li key={s.k} className="relative sm:pr-6">
+            <div className="flex items-center gap-2" aria-hidden>
+              <span className={`size-2.5 rounded-full ${s.tone}`} />
+              {i < steps.length - 1 ? <span className="hidden h-px flex-1 bg-line-strong sm:block" /> : null}
+            </div>
+            <p className="kicker mt-3">{s.k}</p>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">{s.body}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

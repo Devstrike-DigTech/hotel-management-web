@@ -24,7 +24,8 @@ export async function generateMetadata({ searchParams }: PageProps<"/stays">): P
 }
 
 function sortHotels(list: HotelCard[], sort: string) {
-  const byPrice = (a: HotelCard, b: HotelCard) => (a.startingRateKobo ?? Infinity) - (b.startingRateKobo ?? Infinity);
+  const price = (h: HotelCard) => h.searchAvailability?.cheapestTotalKobo ?? h.startingRateKobo ?? Infinity;
+  const byPrice = (a: HotelCard, b: HotelCard) => price(a) - price(b);
   const copy = [...list];
   switch (sort) {
     case "price-asc":
@@ -55,7 +56,18 @@ export default async function StaysPage({ searchParams }: PageProps<"/stays">) {
   const [citiesRes, facetRes, resultRes] = await Promise.all([
     settle(api.cities()),
     settle(allHotels({ city: city || undefined, q: q || undefined })),
-    settle(allHotels({ city: city || undefined, q: q || undefined, guests, minPriceKobo: minK, maxPriceKobo: maxK })),
+    settle(
+      allHotels({
+        city: city || undefined,
+        q: q || undefined,
+        guests,
+        minPriceKobo: minK,
+        maxPriceKobo: maxK,
+        // With dates the API returns only hotels with a room free for every night, priced for the stay.
+        checkIn: stay.checkIn && stay.checkOut ? stay.checkIn : undefined,
+        checkOut: stay.checkIn && stay.checkOut ? stay.checkOut : undefined,
+      }),
+    ),
   ]);
   const cities = citiesRes.data ?? [];
   const facet = facetRes.data ?? [];
@@ -128,8 +140,8 @@ export default async function StaysPage({ searchParams }: PageProps<"/stays">) {
           {cityInfo ? `${cityInfo.state === "FCT" ? "Federal Capital Territory" : `${cityInfo.state} State`}. ` : ""}
           {stay.checkIn && stay.checkOut ? (
             <>
-              Showing prices for <span className="num text-ink">{formatShort(stay.checkIn)}</span> to{" "}
-              <span className="num text-ink">{formatShort(stay.checkOut)}</span>, {guests} {guests === 1 ? "guest" : "guests"}.
+              Hotels with a room free every night from <span className="num text-ink">{formatShort(stay.checkIn)}</span> to{" "}
+              <span className="num text-ink">{formatShort(stay.checkOut)}</span> for {guests} {guests === 1 ? "guest" : "guests"}, priced for the whole stay.
             </>
           ) : (
             "Nightly prices from each hotel's front desk, in naira, before VAT."
@@ -161,6 +173,7 @@ export default async function StaysPage({ searchParams }: PageProps<"/stays">) {
               <span className="num text-lg font-medium">{String(results.length).padStart(2, "0")}</span>{" "}
               <span className="text-ink-muted">{results.length === 1 ? "stay" : "stays"}</span>
               {filtersActive ? <span className="text-ink-muted"> match your filters</span> : null}
+              {stay.checkIn && stay.checkOut && !filtersActive ? <span className="text-ink-muted"> with rooms free for your dates</span> : null}
             </h2>
             <Suspense>
               <SortSelect value={sort} />
@@ -179,7 +192,12 @@ export default async function StaysPage({ searchParams }: PageProps<"/stays">) {
               ))}
             </div>
           ) : (
-            <EmptyState city={city} filtersActive={filtersActive} cities={cities.filter((c) => c.name !== city)} />
+            <EmptyState
+              city={city}
+              filtersActive={filtersActive}
+              dated={!!(stay.checkIn && stay.checkOut)}
+              cities={cities.filter((c) => c.name !== city)}
+            />
           )}
         </section>
       </div>
@@ -187,7 +205,17 @@ export default async function StaysPage({ searchParams }: PageProps<"/stays">) {
   );
 }
 
-function EmptyState({ city, filtersActive, cities }: { city: string; filtersActive: boolean; cities: { name: string; hotelCount: number }[] }) {
+function EmptyState({
+  city,
+  filtersActive,
+  dated,
+  cities,
+}: {
+  city: string;
+  filtersActive: boolean;
+  dated: boolean;
+  cities: { name: string; hotelCount: number }[];
+}) {
   return (
     <div className="grid items-center gap-10 py-16 md:grid-cols-[14rem_1fr]">
       <EmptyRack className="mx-auto w-44 text-ink md:w-full" />
@@ -197,14 +225,16 @@ function EmptyState({ city, filtersActive, cities }: { city: string; filtersActi
           Nothing matches{city ? <> in <em className="accent">{city}</em></> : null}, yet.
         </h3>
         <p className="mt-4 max-w-md leading-relaxed text-ink-muted">
-          {filtersActive
+          {dated && !filtersActive
+            ? "Every hotel we list here is full on at least one of those nights. Try moving your dates by a day, or look without dates to see who has rooms around then."
+            : filtersActive
             ? "Try loosening the price range or dropping an amenity or two. Most hotels here have generators and Wi-Fi even when they forget to list them."
             : "We are adding hotels city by city, and only list places that run their front desk with us. Try a neighbouring city in the meantime."}
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          {filtersActive ? (
+          {filtersActive || dated ? (
             <Link href={city ? `/stays?city=${encodeURIComponent(city)}` : "/stays"} className="btn btn-ink">
-              Clear filters
+              {filtersActive ? "Clear filters" : "Search without dates"}
             </Link>
           ) : null}
           {cities.slice(0, 4).map((c) => (

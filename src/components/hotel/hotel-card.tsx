@@ -110,15 +110,36 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
           <Rating rating={hotel.rating} reviewCount={hotel.reviewCount} />
         </div>
       </div>
-      <div className="flex items-end justify-between gap-4 border-t border-line pt-4 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-8 md:pt-0">
-        <div className="md:text-right">
-          <p className="kicker">From, per night</p>
-          <Money kobo={hotel.startingRateKobo} className="mt-1 block text-2xl font-medium text-ink" />
-          <p className="mt-0.5 text-xs text-ink-muted">before 7.5% VAT</p>
+      <div className="flex items-end justify-between gap-4 border-t border-line pt-4 md:w-48 md:flex-col md:items-end md:justify-between md:border-l md:border-t-0 md:pl-8 md:pt-0">
+        {hotel.searchAvailability ? (
+          <div className="md:text-right" data-testid="result-price">
+            <p className="kicker">
+              {hotel.searchAvailability.nights} {hotel.searchAvailability.nights === 1 ? "night" : "nights"}, all in
+            </p>
+            <Money kobo={hotel.searchAvailability.cheapestTotalKobo} className="mt-1 block text-2xl font-medium text-ink" />
+            <p className="mt-0.5 text-xs text-ink-muted">
+              <Money kobo={hotel.searchAvailability.cheapestRateKobo} /> a night, taxes included in total
+            </p>
+            <p className="kicker mt-2.5 inline-flex items-center gap-1.5 !text-palm">
+              <span aria-hidden className="size-1.5 rounded-full bg-palm" />
+              {hotel.searchAvailability.availableRoomTypes} {hotel.searchAvailability.availableRoomTypes === 1 ? "room type" : "room types"} free
+            </p>
+          </div>
+        ) : (
+          <div className="md:text-right">
+            <p className="kicker">From, per night</p>
+            <Money kobo={hotel.startingRateKobo} className="mt-1 block text-2xl font-medium text-ink" />
+            <p className="mt-0.5 text-xs text-ink-muted">before taxes</p>
+          </div>
+        )}
+        <div className="flex flex-col items-end gap-2">
+          {hotel.freeCancellationHours ? (
+            <p className="hidden text-right text-xs text-ink-muted md:block">Free cancellation up to {hotel.freeCancellationHours} h before</p>
+          ) : null}
+          <span className="btn btn-outline pointer-events-none !min-h-10 text-sm group-hover:border-ink">
+            {hotel.searchAvailability ? "Choose a room" : "See rooms"} <ArrowUpRight size={15} aria-hidden />
+          </span>
         </div>
-        <span className="btn btn-outline pointer-events-none !min-h-10 text-sm group-hover:border-ink">
-          See rooms <ArrowUpRight size={15} aria-hidden />
-        </span>
       </div>
     </article>
   );

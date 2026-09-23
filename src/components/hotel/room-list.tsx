@@ -1,9 +1,8 @@
-import { Bed, Clock, Ruler, UsersThree } from "@phosphor-icons/react/ssr";
+import { Bed, Ruler, UsersThree } from "@phosphor-icons/react/ssr";
 import type { RoomTypePublic } from "@/lib/types";
 import { AmenityIcon } from "../ui/amenity";
-import { Money } from "../ui/money";
 import { Plate } from "../ui/plate";
-import { SelectRoomLink } from "./stay-context";
+import { RoomOffer } from "./stay-context";
 
 export function RoomList({ rooms }: { rooms: RoomTypePublic[] }) {
   if (!rooms.length)
@@ -19,8 +18,6 @@ export function RoomList({ rooms }: { rooms: RoomTypePublic[] }) {
 }
 
 function RoomRow({ room, n }: { room: RoomTypePublic; n: number }) {
-  const soldOut = room.availableCount <= 0;
-  const scarce = !soldOut && room.availableCount <= 3;
   return (
     <li className="grid gap-5 py-7 sm:grid-cols-[11rem_1fr] lg:grid-cols-[12rem_1fr_auto] lg:gap-7">
       <Plate
@@ -62,20 +59,7 @@ function RoomRow({ room, n }: { room: RoomTypePublic; n: number }) {
         ) : null}
       </div>
       <div className="flex flex-col gap-4 border-t border-line pt-4 sm:col-span-2 sm:flex-row sm:items-end sm:justify-between lg:col-span-1 lg:w-52 lg:flex-col lg:items-end lg:justify-between lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
-        <div className="lg:text-right">
-          <p className="kicker">Per night</p>
-          <Money kobo={room.basePriceKobo} className="mt-1 block text-2xl font-medium" />
-          {room.hourlyPriceKobo ? (
-            <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-brass">
-              <Clock size={14} weight="bold" aria-hidden />
-              Day use <Money kobo={room.hourlyPriceKobo} className="font-medium" /> / hr
-            </p>
-          ) : null}
-          <p className={`kicker mt-3 ${soldOut ? "" : scarce ? "!text-laterite" : "!text-palm"}`}>
-            {soldOut ? "Fully booked" : scarce ? `Only ${room.availableCount} left` : `${room.availableCount} available`}
-          </p>
-        </div>
-        <SelectRoomLink roomId={room.id} soldOut={soldOut} name={room.name} />
+        <RoomOffer roomId={room.id} name={room.name} basePriceKobo={room.basePriceKobo} hourlyPriceKobo={room.hourlyPriceKobo} />
       </div>
     </li>
   );

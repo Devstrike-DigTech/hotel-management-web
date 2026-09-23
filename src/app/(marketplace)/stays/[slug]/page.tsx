@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { HotelView } from "@/components/hotel/hotel-view";
 import { HotelJsonLd } from "@/components/hotel/json-ld";
-import { api } from "@/lib/api";
+import { api, settle } from "@/lib/api";
 import { normaliseStay, todayInLagos } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
 
@@ -28,6 +28,7 @@ export default async function HotelPage({ params, searchParams }: PageProps<"/st
   const sp = await searchParams;
   const hotel = await getHotel(slug);
   if (!hotel) notFound();
+  const reviews = await settle(api.reviews(hotel.slug, { pageSize: 6 }));
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
   const guests = Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12);
@@ -37,6 +38,7 @@ export default async function HotelPage({ params, searchParams }: PageProps<"/st
       <HotelJsonLd hotel={hotel} path={`/stays/${hotel.slug}`} />
       <HotelView
         hotel={hotel}
+        reviews={reviews.data}
         today={today}
         initial={{ ...stay, guests }}
         bookBase={`/stays/${hotel.slug}/book`}
