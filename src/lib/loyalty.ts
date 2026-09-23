@@ -1,45 +1,38 @@
 /**
- * M5 loyalty view models. A hotel group (the tenant) runs one programme across all of its
- * properties, so a guest holds one balance and one tier per group. Adapters from the API's
- * shapes live next to the types so components never read raw responses.
+ * M5 loyalty view models (API-M5.md section 6.4). A hotel group runs one programme across all of its
+ * properties, so a guest holds one balance and one tier per group. Adapters from the API's shapes
+ * live here so components never read raw responses.
  */
+import type { GuestLoyaltyTxn, GuestMembership, LoyaltyTxnType, QuoteLoyalty } from "./booking-types";
+import type { HotelLoyalty } from "./types";
+
+export type TierColor = "palm" | "brass" | "laterite" | "adire" | "ochre";
 
 export interface LoyaltyTierView {
-  code: string;
   name: string;
-  /** Nights in a calendar year needed to reach this tier (0 for the entry tier). */
-  minNights: number;
+  color: TierColor | null;
   perks: string[];
-  bonusPct: number;
 }
 
 export interface LoyaltyMembershipView {
-  group: { slug: string | null; name: string; logoUrl: string | null; accentColor: string | null };
+  group: { slug: string | null; name: string };
   programmeName: string;
   memberNumber: string | null;
   points: number;
   /** What the balance is worth off a stay, in kobo. */
   pointsValueKobo: number;
-  /** Kobo one point is worth when redeemed. */
-  pointValueKobo: number;
-  /** Points earned per ₦1,000 spent on rooms and outlets (before any tier bonus). */
-  earnPerThousand: number;
-  tier: LoyaltyTierView;
-  tiers: LoyaltyTierView[];
+  /** Points per ₦1,000 spent, when known (it comes from the hotel's programme, not the membership). */
+  earnPerThousand: number | null;
+  tier: LoyaltyTierView | null;
   nightsThisYear: number;
-  next: { tier: LoyaltyTierView; nightsToGo: number } | null;
+  next: { name: string; nightsToGo: number } | null;
   expiring: { points: number; on: string } | null;
-  memberSince: string | null;
-  /** Properties in the group where the points can be earned and spent. */
-  properties: { slug: string; name: string; area: string; city: string }[];
 }
-
-export type StatementKind = "EARN" | "REDEEM" | "ADJUST" | "EXPIRE" | "BONUS" | "REVERSAL";
 
 export interface StatementEntryView {
   id: string;
   at: string;
-  kind: StatementKind;
+  kind: LoyaltyTxnType;
   /** Signed: positive for points in, negative for points out. */
   points: number;
   description: string;
@@ -53,15 +46,18 @@ export interface RedeemOffer {
   programmeName: string;
   groupName: string;
   balance: number;
-  /** The most the stay can take (policy caps, the total, the balance). */
+  /** The most the stay can take (the programme's cap on the total, and the balance). */
   maxPoints: number;
   minPoints: number;
-  /** Points are redeemed in steps (e.g. 100). */
+  /** The slider moves in steps (e.g. 100); "use the most" is always exact. */
   step: number;
   pointValueKobo: number;
   /** Why the guest cannot redeem, when they cannot. */
   reason: string | null;
 }
+
+const COLORS = new Set<TierColor>(["palm", "brass", "laterite", "adire", "ochre"]);
+const asColor = (c: string | null | undefined): TierColor | null => (c && COLORS.has(c as TierColor) ? (c as TierColor) : null);
 
 export const pointsToKobo = (points: number, pointValueKobo: number) => Math.round(points * pointValueKobo);
 
@@ -70,32 +66,58 @@ export function formatPoints(n: number) {
   return n < 0 ? `−${s}` : s;
 }
 
-/** Rounds a wish down to the offer's step and into its range. */
+/** Rounds a wish down to the offer's step and into its range; the maximum itself is always allowed. */
 export function clampPoints(want: number, offer: Pick<RedeemOffer, "maxPoints" | "minPoints" | "step">) {
+  if (offer.maxPoints < offer.minPoints) return 0;
+  if (want >= offer.maxPoints) return offer.maxPoints;
   const step = Math.max(1, offer.step);
-  const max = Math.floor(offer.maxPoints / step) * step;
-  if (max < offer.minPoints) return 0;
   const n = Math.floor(Math.max(0, want) / step) * step;
-  return Math.min(max, Math.max(offer.minPoints, n));
+  return Math.min(offer.maxPoints, Math.max(offer.minPoints, n));
 }
 
-/** Tier progress as a fraction between the current tier's threshold and the next. */
-export function tierProgress(m: Pick<LoyaltyMembershipView, "nightsThisYear" | "tier" | "next">) {
-  if (!m.next) return 1;
-  const span = m.next.tier.minNights - m.tier.minNights;
-  if (span <= 0) return 1;
-  return Math.max(0, Math.min(1, (m.nightsThisYear - m.tier.minNights) / span));
+export function membershipView(m: GuestMembership, earnPerThousand: number | null = null): LoyaltyMembershipView {
+  return {
+    group: { slug: m.group.slug, name: m.group.name },
+    programmeName: m.programme,
+    memberNumber: m.memberNo,
+    points: m.points,
+    pointsValueKobo: m.valueKobo,
+    earnPerThousand,
+    tier: m.tier ? { name: m.tier.name, color: asColor(m.tier.color), perks: m.tier.perks ?? [] } : null,
+    nightsThisYear: m.nights12m,
+    next: m.nextTier ? { name: m.nextTier.name, nightsToGo: m.nextTier.nightsNeeded } : null,
+    expiring: m.expiringSoon ? { points: m.expiringSoon.points, on: m.expiringSoon.date } : null,
+  };
 }
 
-/** Earned points for a spend, as the programme states it (per ₦1,000, bonus by tier). */
-export function estimateEarn(spendKobo: number, earnPerThousand: number, bonusPct = 0) {
-  const base = Math.floor(spendKobo / 100_000) * earnPerThousand;
-  return Math.floor(base * (1 + bonusPct / 100));
+export function statementView(t: GuestLoyaltyTxn): StatementEntryView {
+  return {
+    id: t.id,
+    at: t.createdAt,
+    kind: t.type,
+    points: t.points,
+    description: t.description,
+    code: t.reservation?.code ?? null,
+    propertyName: t.property?.name ?? null,
+    balanceAfter: t.balanceAfter ?? null,
+  };
 }
 
-/** A tier's rank among the programme's tiers (0 = entry), used for the badge's weight. */
-export function tierRank(tier: LoyaltyTierView, tiers: LoyaltyTierView[]) {
-  const sorted = [...tiers].sort((a, b) => a.minNights - b.minNights);
-  const i = sorted.findIndex((t) => t.code === tier.code);
-  return i < 0 ? 0 : i;
+/**
+ * The review step's redemption offer, from the quote's loyalty block and the hotel's programme.
+ * Null when there is nothing to offer (no programme, not a member, or signed out).
+ */
+export function redeemOffer(q: QuoteLoyalty | null | undefined, programme: HotelLoyalty["programme"] | null, groupName: string): RedeemOffer | null {
+  if (!q || !q.member || q.pointsBalance === null) return null;
+  const pointValueKobo = programme?.pointValueKobo ?? (q.pointsRedeemed > 0 ? q.redeemValueKobo / q.pointsRedeemed : 100);
+  const minPoints = programme?.minRedeemPoints ?? 1;
+  // When points are already applied, the cap is for the stay before them.
+  const maxPoints = Math.max(0, Math.min(q.pointsBalance, q.maxRedeemablePoints ?? q.pointsBalance));
+  const reason =
+    q.pointsBalance < minPoints
+      ? `You can use them from ${formatPoints(minPoints)} points.`
+      : maxPoints < minPoints
+        ? `This stay is too small to use points on; the hotel takes them off stays worth at least ${formatPoints(minPoints)} points.`
+        : null;
+  return { programmeName: q.programme, groupName, balance: q.pointsBalance, maxPoints, minPoints, step: 100, pointValueKobo, reason };
 }

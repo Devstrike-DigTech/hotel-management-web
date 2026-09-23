@@ -52,6 +52,58 @@ export interface PriceBreakdown {
   ratePlan?: { id: string; code: string; name: string; kind: string; includesBreakfast: boolean; refundable: boolean } | null;
   promo?: { code: string; description: string; type: string; discountKobo: number } | null;
   discountLines?: { date: string; description: string; amountKobo: number }[];
+  /* M5: the part of discountKobo that came from loyalty points. */
+  loyaltyDiscountKobo?: number;
+}
+
+/** M5: loyalty on a quote (null when the hotel has no programme). */
+export interface QuoteLoyalty {
+  programme: string;
+  member: boolean;
+  pointsBalance: number | null;
+  pointsRedeemed: number;
+  redeemValueKobo: number;
+  maxRedeemablePoints: number | null;
+  pointsToEarn: number;
+  tier: string | null;
+}
+
+/** M5: loyalty on a booking. `pointsEarned` is set after check-out. */
+export interface BookingLoyalty {
+  programme: string;
+  pointsRedeemed: number;
+  redeemValueKobo: number;
+  pointsToEarn: number;
+  pointsEarned: number | null;
+}
+
+export type LoyaltyTxnType = "EARN" | "REDEEM" | "EXPIRE" | "ADJUST" | "REVERSAL";
+
+export interface GuestLoyaltyTxn {
+  id: string;
+  type: LoyaltyTxnType;
+  points: number;
+  balanceAfter: number;
+  description: string;
+  reason: string | null;
+  property: { id: string; name: string; slug: string } | null;
+  reservation: { id: string; code: string } | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+/** M5: `GET /guest/loyalty`. */
+export interface GuestMembership {
+  group: { slug: string; name: string };
+  programme: string;
+  memberNo: string;
+  tier: { name: string; color: string; perks: string[] } | null;
+  points: number;
+  valueKobo: number;
+  nights12m: number;
+  nextTier: { name: string; nightsNeeded: number } | null;
+  expiringSoon: { points: number; date: string } | null;
+  recent: GuestLoyaltyTxn[];
 }
 
 export interface HotelMini {
@@ -202,6 +254,8 @@ export interface Quote {
   /* M4 */
   ratePlan?: RawPlan | null;
   promo?: { code: string; description?: string | null; discountKobo: number } | null;
+  /* M5 */
+  loyalty?: QuoteLoyalty | null;
 }
 
 export interface PaymentInit {
@@ -263,6 +317,8 @@ export interface BookingView {
   /* M4 */
   ratePlan?: { code: string; name: string; includesBreakfast: boolean; refundable: boolean } | null;
   promo?: { code: string; discountKobo: number } | null;
+  /* M5 */
+  loyalty?: BookingLoyalty | null;
 }
 
 export interface BookingCreated {
@@ -340,6 +396,8 @@ export interface TripSummary {
   reviewed: boolean;
   manageToken: string;
   manageUrl: string;
+  /* M5 */
+  pointsEarned?: number | null;
 }
 
 export interface ReviewRequest {

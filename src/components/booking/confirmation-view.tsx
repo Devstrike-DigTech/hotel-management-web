@@ -8,6 +8,10 @@ import type { BookingView, PaymentInit, PaymentStatusView } from "@/lib/booking-
 import { call, ClientApiError, getClockSkew, humanError, newKey } from "@/lib/client-api";
 import { formatFullDay } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
+import { formatPoints } from "@/lib/loyalty";
+import { WhatsAppChat } from "../chat/whatsapp-chat";
+import { useHotelChat } from "../chat/use-hotel-chat";
+import { PointsToEarn } from "../loyalty/redeem-points";
 import { formatLagosDateTime, formatLagosShort, policyTail } from "@/lib/time";
 import { useOnline } from "@/lib/use-online";
 import { Notice } from "../ui/field";
@@ -21,6 +25,9 @@ const CHANNEL: Record<string, string> = { card: "card", bank_transfer: "bank tra
 export function toConfirmation(b: BookingView, manageHref: string | null): ConfirmationData {
   const unit = b.breakdown.unit === "HOUR" ? "hour" : "night";
   const room = b.breakdown.lines.reduce((n, l) => n + l.amountKobo, 0);
+  // M5: the part of the discount paid with loyalty points gets its own line.
+  const pointsKobo = Math.min(b.breakdown.discountKobo, b.breakdown.loyaltyDiscountKobo ?? b.loyalty?.redeemValueKobo ?? 0);
+  const otherDiscount = b.breakdown.discountKobo - pointsKobo;
   const paidLabel = b.payment?.paidAt
     ? `Paid by ${CHANNEL[b.payment.channel ?? ""] ?? "Paystack"}, ${formatLagosShort(b.payment.paidAt).replace(/,.*$/, "")}`
     : "Paid online";
@@ -54,8 +61,11 @@ export function toConfirmation(b: BookingView, manageHref: string | null): Confi
       ...(b.ratePlan && !/^(bar|best available( rate)?|flexible)$/i.test(b.ratePlan.name)
         ? [{ label: `${b.ratePlan.name} rate${b.ratePlan.includesBreakfast ? ", breakfast included" : ""}`, amountKobo: 0, kind: "note" as const }]
         : []),
-      ...(b.breakdown.discountKobo > 0
-        ? [{ label: b.promo?.code || b.breakdown.promo?.code ? `Promo ${b.promo?.code ?? b.breakdown.promo?.code}` : "Discount", amountKobo: -b.breakdown.discountKobo, kind: "discount" as const }]
+      ...(otherDiscount > 0
+        ? [{ label: b.promo?.code || b.breakdown.promo?.code ? `Promo ${b.promo?.code ?? b.breakdown.promo?.code}` : "Discount", amountKobo: -otherDiscount, kind: "discount" as const }]
+        : []),
+      ...(pointsKobo > 0
+        ? [{ label: `${b.loyalty?.programme ?? "Loyalty"}, ${formatPoints(b.loyalty?.pointsRedeemed ?? 0)} points`, amountKobo: -pointsKobo, kind: "discount" as const }]
         : []),
       ...b.breakdown.taxes.map((t) => ({ label: `${t.label} ${t.rateBps / 100}%${t.inclusive ? ", included" : ""}`, amountKobo: t.amountKobo, kind: "tax" as const })),
     ],
@@ -197,6 +207,7 @@ export function ConfirmationView({
   }, [reference, code, token]);
 
   const holdLeft = useRemaining(view.kind === "payment" ? view.status?.booking.hold?.expiresAt : null, getClockSkew());
+  const chat = useHotelChat(view.kind === "booking" ? view.booking.hotel.slug : null);
 
   async function retryPayment(s: PaymentStatusView) {
     setRetrying(true);
@@ -324,6 +335,15 @@ export function ConfirmationView({
       ) : null}
 
       <ConfirmationCard data={data} appName={appName} />
+
+      {!cancelled && (chat || (b.loyalty && b.loyalty.pointsToEarn > 0)) ? (
+        <div className="mx-auto mt-8 grid max-w-[46rem] gap-4 sm:grid-cols-2">
+          {b.loyalty && b.loyalty.pointsToEarn > 0 ? (
+            <PointsToEarn points={b.loyalty.pointsEarned ?? b.loyalty.pointsToEarn} programmeName={b.loyalty.programme} state={b.loyalty.pointsEarned !== null ? "earned" : "pending"} className={chat ? "" : "sm:col-span-2"} />
+          ) : null}
+          {chat ? <WhatsAppChat number={chat} hotelName={b.hotel.name} code={b.code} className={b.loyalty && b.loyalty.pointsToEarn > 0 ? "" : "sm:col-span-2"} /> : null}
+        </div>
+      ) : null}
 
       {!cancelled ? (
         <section aria-labelledby="next-title" className="mx-auto mt-14 max-w-[46rem]">

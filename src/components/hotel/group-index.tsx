@@ -128,7 +128,7 @@ export function GroupIndex({ group, properties, loyalty }: Props) {
       {loyalty ? (
         <section aria-labelledby="circle-title" className="relative mt-10 overflow-hidden rounded-md border border-brass/50 bg-brass/[0.05] px-6 py-8 sm:px-10">
           <span aria-hidden className="adire-field pointer-events-none absolute -right-8 top-0 h-full w-64 text-brass opacity-[0.12]" />
-          <p className="kicker !text-brass">One programme, every house</p>
+          <p className="kicker flex items-center gap-2 !text-ink"><span aria-hidden className="size-1.5 rotate-45 bg-brass" />One programme, every house</p>
           <h2 id="circle-title" className="display-sm mt-2 text-[1.7rem]">
             {loyalty.programmeName}
           </h2>

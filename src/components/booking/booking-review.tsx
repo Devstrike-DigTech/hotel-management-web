@@ -24,6 +24,9 @@ import { diffDays, formatShort, formatWeekday } from "@/lib/dates";
 import { isNonRefundable, isPromoError, nightlyVaries, planTitle, promoMessage, type PlanOffer } from "@/lib/rates";
 import { Notice } from "../ui/field";
 import { PromoField, type PromoProblem } from "./promo-field";
+import { RedeemPoints } from "../loyalty/redeem-points";
+import { formatPoints, redeemOffer } from "@/lib/loyalty";
+import type { HotelLoyalty } from "@/lib/types";
 import { StepTitle, composeRequests, type BookingHotel, type BookingSite, type GuestForm } from "./booking-flow";
 import { HoldCountdown, useRemaining } from "./hold-countdown";
 
@@ -91,6 +94,23 @@ export function BookingReview({
   useEffect(() => {
     promoRef.current = promoCode;
   }, [promoCode]);
+  // M5: loyalty points applied through the quote, like a promo code.
+  const [points, setPoints] = useState<number | null>(null);
+  const [pointsBusy, setPointsBusy] = useState(false);
+  const [pointsProblem, setPointsProblem] = useState<string | null>(null);
+  const [programme, setProgramme] = useState<HotelLoyalty["programme"]>(null);
+  const pointsRef = useRef<number | null>(null);
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+  const withExtras = useCallback(
+    (promo: string | null | undefined, pts: number | null | undefined) => ({
+      ...JSON.parse(requestKey),
+      ...(promo ? { promoCode: promo } : {}),
+      ...(pts ? { redeemPoints: pts } : {}),
+    }),
+    [requestKey],
+  );
   const stay = request as { checkIn?: string; checkOut?: string };
   const nights = stay.checkIn && stay.checkOut ? diffDays(stay.checkIn, stay.checkOut) : 0;
 
@@ -108,20 +128,24 @@ export function BookingReview({
   );
 
   const fetchQuote = useCallback(
-    async (prev?: Quote | null, promo: string | null | undefined = promoRef.current) => {
+    async (prev?: Quote | null, promo: string | null | undefined = promoRef.current, pts: number | null | undefined = pointsRef.current) => {
       setBusy("quote");
       setQuoteError(null);
       try {
-        const body = { ...JSON.parse(requestKey), ...(promo ? { promoCode: promo } : {}) };
         let q: Quote;
         try {
-          q = await call<Quote>("public/quotes", { method: "POST", body, retries: 2 });
+          q = await call<Quote>("public/quotes", { method: "POST", body: withExtras(promo, pts), retries: 2 });
         } catch (e) {
           // A code that stopped working (used up, dates moved): price without it and say why.
           if (promo && e instanceof ClientApiError && isPromoError(e.code)) {
             setPromoCode(null);
             setPromoProblem(explainPromo(promo, e));
-            q = await call<Quote>("public/quotes", { method: "POST", body: JSON.parse(requestKey), retries: 2 });
+            q = await call<Quote>("public/quotes", { method: "POST", body: withExtras(null, pts), retries: 2 });
+          } else if (pts && e instanceof ClientApiError && isLoyaltyError(e.code)) {
+            // Points that no longer fit (signed out, balance moved, the stay changed): price without them.
+            setPoints(null);
+            setPointsProblem(loyaltyMessage(e));
+            q = await call<Quote>("public/quotes", { method: "POST", body: withExtras(promo, null), retries: 2 });
           } else throw e;
         }
         setQuote(q);
@@ -145,7 +169,7 @@ export function BookingReview({
         setBusy(null);
       }
     },
-    [requestKey, onQuote, onBack, explainPromo],
+    [withExtras, onQuote, onBack, explainPromo],
   );
 
   /** Applies a code by re-pricing the stay with it; the old price stays on screen if it is refused. */
@@ -154,8 +178,8 @@ export function BookingReview({
     setPromoProblem(null);
     setError(null);
     try {
-      const q = await call<Quote>("public/quotes", { method: "POST", body: { ...JSON.parse(requestKey), promoCode: code }, retries: 1 });
-      if (!q.promo && !(q.breakdown.discountKobo > 0)) {
+      const q = await call<Quote>("public/quotes", { method: "POST", body: withExtras(code, pointsRef.current), retries: 1 });
+      if (!q.promo && !(q.breakdown.discountKobo - (q.breakdown.loyaltyDiscountKobo ?? 0) > 0)) {
         setPromoProblem({ code: "PROMO_NO_SAVING", message: `\u201c${code}\u201d does not lower the price of this stay.`, hint: null });
         return;
       }
@@ -176,6 +200,44 @@ export function BookingReview({
     setPromoProblem(null);
     await fetchQuote(null, null);
   }
+
+  /** Uses points by re-pricing the stay with them; the price stays as it was if they are refused. */
+  async function applyPoints(n: number) {
+    setPointsBusy(true);
+    setPointsProblem(null);
+    setError(null);
+    try {
+      const q = await call<Quote>("public/quotes", { method: "POST", body: withExtras(promoRef.current, n), retries: 1 });
+      setQuote(q);
+      onQuote(q);
+      bookKey.current = null;
+      setPoints(q.loyalty?.pointsRedeemed || n);
+    } catch (e) {
+      if (e instanceof ClientApiError && (isLoyaltyError(e.code) || e.code === "VALIDATION_ERROR")) setPointsProblem(loyaltyMessage(e));
+      else setPointsProblem(humanError(e, "We could not use your points just now. Your stay is still priced without them."));
+    } finally {
+      setPointsBusy(false);
+    }
+  }
+
+  async function removePoints() {
+    setPoints(null);
+    setPointsProblem(null);
+    await fetchQuote(null, promoRef.current, null);
+  }
+
+  // The programme's terms (point value, minimum) for the offer, once the quote says the guest is a member.
+  const member = !!quote?.loyalty?.member;
+  useEffect(() => {
+    if (!member || programme) return;
+    const ctl = new AbortController();
+    call<HotelLoyalty>(`public/hotels/${encodeURIComponent(hotel.slug)}/loyalty`, { signal: ctl.signal })
+      .then((l) => setProgramme(l.programme))
+      .catch(() => undefined);
+    return () => ctl.abort();
+  }, [member, programme, hotel.slug]);
+  const offer = redeemOffer(quote?.loyalty, programme, hotel.groupName ?? hotel.name);
+  const redeemed = quote?.loyalty && quote.loyalty.pointsRedeemed > 0 ? { points: quote.loyalty.pointsRedeemed, discountKobo: quote.loyalty.redeemValueKobo } : null;
 
   useEffect(() => {
     if (held) return;
@@ -254,6 +316,12 @@ export function BookingReview({
           return setError(Object.values(f).flat().join(" ") || e.message);
         }
         default:
+          if (isLoyaltyError(e.code) && points) {
+            setPointsProblem(loyaltyMessage(e));
+            setPoints(null);
+            await fetchQuote(q, promoRef.current, null);
+            return setError("Your points could not be used after all, so the price is now without them. Check the new total, then book.");
+          }
           if (isPromoError(e.code) && promoCode) {
             setPromoProblem(explainPromo(promoCode, e));
             setPromoCode(null);
@@ -453,8 +521,23 @@ export function BookingReview({
         )}
         {!held ? (
           <div className="mt-5">
-            <PromoField applied={quote?.promo ?? quote?.breakdown.promo ?? (promoCode && quote && quote.breakdown.discountKobo > 0 ? { code: promoCode, description: null, discountKobo: quote.breakdown.discountKobo } : null)} busy={promoBusy} problem={promoProblem} onApply={applyPromo} onRemove={removePromo} disabled={!quote} />
+            <PromoField applied={quote?.promo ?? quote?.breakdown.promo ?? (promoCode && quote && quote.breakdown.discountKobo > 0 ? { code: promoCode, description: null, discountKobo: quote.breakdown.discountKobo - (quote.breakdown.loyaltyDiscountKobo ?? 0) } : null)} busy={promoBusy} problem={promoProblem} onApply={applyPromo} onRemove={removePromo} disabled={!quote} />
           </div>
+        ) : null}
+        {!held && offer ? (
+          <div className="mt-4">
+            <RedeemPoints offer={offer} applied={redeemed} busy={pointsBusy} problem={pointsProblem} onApply={applyPoints} onRemove={removePoints} disabled={!quote || busy === "quote"} />
+          </div>
+        ) : !held && pointsProblem ? (
+          <p className="mt-4 text-sm text-ink-muted" role="status" data-testid="points-error">
+            {pointsProblem}
+          </p>
+        ) : null}
+        {quote?.loyalty?.member && quote.loyalty.pointsToEarn > 0 ? (
+          <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-muted" data-testid="review-points-to-earn">
+            <span aria-hidden className="size-1.5 rotate-45 bg-brass" />
+            This stay earns about <span className="num text-ink">{formatPoints(quote.loyalty.pointsToEarn)}</span> {quote.loyalty.programme} points after check-out.
+          </p>
         ) : null}
         {quote && (quote.cancellationPolicy.nonRefundable || quote.ratePlan?.refundable === false || (plan && isNonRefundable(plan))) ? (
           <p className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed" data-testid="policy-line" data-policy="non-refundable">
@@ -583,6 +666,8 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
   const inclusive = b.taxes.some((t) => t.inclusive);
   const nightsSum = b.lines.reduce((n, l) => n + l.amountKobo, 0);
   const promo = quote.promo ?? b.promo ?? null;
+  const pointsKobo = Math.min(b.discountKobo, b.loyaltyDiscountKobo ?? quote.loyalty?.redeemValueKobo ?? 0);
+  const otherDiscount = b.discountKobo - pointsKobo;
   const seasons = new Map((b.nightly ?? []).map((n) => [n.date, n.ruleName]));
   return (
     <div className={`rounded-sm border border-line-strong bg-surface transition-opacity ${loading ? "opacity-60" : ""}`} data-testid="quote">
@@ -619,13 +704,22 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
             ) : null}
           </div>
         ) : null}
-        {b.discountKobo > 0 ? (
+        {otherDiscount > 0 ? (
           <div className="flex items-baseline gap-3 text-palm" data-testid="discount-line">
             <dt className="inline-flex items-center gap-1.5 font-sans [font-variant-numeric:normal]">
               <Tag size={14} aria-hidden /> {promo ? `Promo ${promo.code}` : "Discount"}
             </dt>
             <span aria-hidden className="leader" />
-            <dd>&minus;{formatNaira(b.discountKobo)}</dd>
+            <dd>&minus;{formatNaira(otherDiscount)}</dd>
+          </div>
+        ) : null}
+        {pointsKobo > 0 ? (
+          <div className="flex items-baseline gap-3 text-palm" data-testid="points-line">
+            <dt className="inline-flex items-center gap-1.5 font-sans [font-variant-numeric:normal]">
+              <span aria-hidden className="mx-[3px] size-2 rotate-45 border border-current" /> {quote.loyalty?.programme ?? "Points"}, <span className="num">{formatPoints(quote.loyalty?.pointsRedeemed ?? 0)}</span> points
+            </dt>
+            <span aria-hidden className="leader" />
+            <dd>&minus;{formatNaira(pointsKobo)}</dd>
           </div>
         ) : null}
         {b.taxes.map((t) => (
@@ -648,7 +742,7 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
       {b.discountKobo > 0 ? (
         <p className="border-t border-line bg-palm/[0.06] px-5 py-2.5 text-[13px] text-palm" data-testid="saving-line">
           You save <span className="num font-medium">{formatNaira(b.discountKobo)}</span>
-          {promo ? <> with {promo.code}</> : null}, before taxes. The total above is what you pay.
+          {promo && pointsKobo ? <> with {promo.code} and your points</> : promo ? <> with {promo.code}</> : pointsKobo ? <> with your points</> : null}, before taxes. The total above is what you pay.
         </p>
       ) : null}
       {inclusive ? <p className="border-t border-line px-5 py-2.5 text-xs text-ink-muted">Some taxes are already inside the room rate, as the hotel sets it.</p> : null}
@@ -690,4 +784,25 @@ export function toHeld(booking: BookingView, manageToken: string, p: PaymentInit
     holdExpiresAt: p.holdExpiresAt,
     provider: p.provider,
   };
+}
+
+const isLoyaltyError = (code: string) => code.startsWith("LOYALTY_");
+
+/** A refused redemption, in plain words. */
+function loyaltyMessage(e: ClientApiError): string {
+  const d = (e.details ?? {}) as { balance?: number; minPoints?: number; maxPoints?: number };
+  switch (e.code) {
+    case "LOYALTY_NOT_MEMBER":
+      return "Points can only be used by a signed-in member. Sign in with the number on your membership to use them.";
+    case "LOYALTY_INSUFFICIENT_POINTS":
+      return d.balance !== undefined ? `You have ${formatPoints(d.balance)} points, fewer than that.` : "You do not have that many points.";
+    case "LOYALTY_REDEMPTION_LIMIT":
+      return d.minPoints !== undefined && d.maxPoints !== undefined
+        ? d.maxPoints < d.minPoints
+          ? `This stay is too small to use points on (the least you can use is ${formatPoints(d.minPoints)}).`
+          : `On this stay you can use between ${formatPoints(d.minPoints)} and ${formatPoints(d.maxPoints)} points.`
+        : e.message;
+    default:
+      return e.message || "Your points could not be used on this stay.";
+  }
 }

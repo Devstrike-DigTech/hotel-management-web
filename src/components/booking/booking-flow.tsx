@@ -51,6 +51,8 @@ export interface BookingHotel {
   coverImageUrl: string | null;
   roomTypes: RoomTypePublic[];
   booking: HotelBookingInfo | null;
+  /** M5: the hotel group's name, for "points with The Palmwine House". */
+  groupName?: string | null;
 }
 
 export interface BookingSite {

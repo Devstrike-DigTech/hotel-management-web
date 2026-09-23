@@ -11,11 +11,12 @@ import {
 } from "@phosphor-icons/react/ssr";
 import type { HotelDetail } from "@/lib/types";
 import type { ISODate } from "@/lib/dates";
-import { formatClock, formatPhone, placeName, roman, toE164Digits } from "@/lib/format";
+import { formatClock, formatPhone, groupLabel, placeName, roman, toE164Digits } from "@/lib/format";
 import { AmenityIcon } from "../ui/amenity";
 import { Gallery } from "./gallery";
 import { Rating } from "./rating";
 import { HotelReviews } from "../reviews/hotel-reviews";
+import { chatMessage, WhatsAppChat, whatsappChatUrl } from "../chat/whatsapp-chat";
 import type { CancellationPolicy, ReviewPage } from "@/lib/booking-types";
 import { RoomList } from "./room-list";
 import { MobileBookBar, StayCard, StayProvider } from "./stay-context";
@@ -41,6 +42,8 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hotel.name}, ${hotel.address || `${hotel.area}, ${hotel.city}`}`)}`;
   const minRoom = hotel.roomTypes.reduce<number | null>((m, r) => (m === null || r.basePriceKobo < m ? r.basePriceKobo : m), null);
   const from = hotel.startingRateKobo ?? minRoom;
+  // M5: only hotels that answer guests on WhatsApp (Pro, whatsapp_messaging) offer a chat.
+  const chat = hotel.whatsapp?.available ? (hotel.whatsapp.phone ?? hotel.whatsapp.waUrl?.replace(/^.*wa\.me\//, "") ?? null) : null;
 
   return (
     <StayProvider initial={initial} today={today} bookBase={bookBase} slug={hotel.slug} cancellationPolicy={policy} channel={variant === "microsite" ? "BOOKING_SITE" : "MARKETPLACE"}>
@@ -111,6 +114,15 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
             {hotel.tagline ? (
               <p className="fade-up mt-4 font-display text-[clamp(1.25rem,2.2vw,1.7rem)] italic leading-snug text-ink-muted [--d:200ms]">
                 {hotel.tagline}
+              </p>
+            ) : null}
+            {hotel.group && hotel.group.propertyCount > 1 ? (
+              <p className="fade-up mt-4 text-[0.9375rem] text-ink-muted [--d:240ms]" data-testid="part-of-group">
+                Part of{" "}
+                <Link href={`/g/${hotel.group.slug}`} className="link-static text-ink">
+                  {groupLabel(hotel.group.name)}
+                </Link>
+                <span className="num">, {hotel.group.propertyCount} hotels</span>
               </p>
             ) : null}
           </div>
@@ -241,16 +253,13 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
                           <span className="num">{formatPhone(hotel.phone)}</span>
                         </a>
                       </li>
-                      <li>
-                        <a
-                          href={`https://wa.me/${toE164Digits(hotel.phone)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 hover:text-laterite"
-                        >
-                          <WhatsappLogo size={18} weight="light" aria-hidden /> Message on WhatsApp
-                        </a>
-                      </li>
+                      {chat ? (
+                        <li>
+                          <a href={whatsappChatUrl(chat, chatMessage(hotel.name))} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 hover:text-laterite">
+                            <WhatsappLogo size={18} weight="light" aria-hidden /> Chat on WhatsApp
+                          </a>
+                        </li>
+                      ) : null}
                     </>
                   ) : null}
                   {hotel.email ? (
@@ -268,6 +277,7 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
           <aside aria-label="Plan your stay" className="lg:col-span-4">
             <div className="lg:sticky lg:top-24">
               <StayCard fromKobo={from} phone={hotel.phone} cancellationSummary={policy?.summary} />
+              {chat ? <WhatsAppChat number={chat} hotelName={hotel.name} className="mt-4" /> : null}
             </div>
           </aside>
         </div>

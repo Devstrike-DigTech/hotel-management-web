@@ -1,7 +1,7 @@
 import { HourglassMedium } from "@phosphor-icons/react/ssr";
 import { formatLong } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
-import { formatPoints, tierRank, type LoyaltyMembershipView } from "@/lib/loyalty";
+import { formatPoints, type LoyaltyMembershipView } from "@/lib/loyalty";
 import { TierBadge } from "./tier-badge";
 
 /**
@@ -10,7 +10,6 @@ import { TierBadge } from "./tier-badge";
  * marks up to the next tier's threshold.
  */
 export function PointsCard({ m, compact = false }: { m: LoyaltyMembershipView; compact?: boolean }) {
-  const rank = tierRank(m.tier, m.tiers);
   return (
     <article
       className="relative overflow-hidden rounded-md border border-line-strong bg-surface shadow-[var(--shadow-card)]"
@@ -23,10 +22,10 @@ export function PointsCard({ m, compact = false }: { m: LoyaltyMembershipView; c
       <div className={`relative ${compact ? "p-5" : "p-5 sm:p-7"}`}>
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="kicker !text-brass">{m.programmeName}</p>
+            <p className="kicker flex items-center gap-2 !text-ink"><span aria-hidden className="size-1.5 rotate-45 bg-brass" />{m.programmeName}</p>
             <h3 className="display-sm mt-1.5 text-[1.45rem] leading-tight">{m.group.name}</h3>
           </div>
-          <TierBadge name={m.tier.name} rank={rank} size="md" />
+          {m.tier ? <TierBadge name={m.tier.name} color={m.tier.color} size="md" /> : null}
         </header>
 
         <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
@@ -44,7 +43,7 @@ export function PointsCard({ m, compact = false }: { m: LoyaltyMembershipView; c
 
         <Tally m={m} />
 
-        {!compact && m.tier.perks.length ? (
+        {!compact && m.tier?.perks.length ? (
           <div className="mt-6 border-t border-line pt-4">
             <p className="kicker !text-[10px]">{m.tier.name} perks</p>
             <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
@@ -70,13 +69,13 @@ export function PointsCard({ m, compact = false }: { m: LoyaltyMembershipView; c
         {!compact ? (
           <footer className="mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-dashed border-line-strong pt-3 text-xs text-ink-muted">
             <span>
-              Earn <span className="num text-ink">{m.earnPerThousand}</span> {m.earnPerThousand === 1 ? "point" : "points"} for every <span className="num">₦1,000</span> on rooms, food and drink
-              {m.tier.bonusPct ? (
+              {m.earnPerThousand ? (
                 <>
-                  , plus <span className="num text-ink">{m.tier.bonusPct}%</span> as {m.tier.name}
+                  Earn <span className="num text-ink">{m.earnPerThousand}</span> {m.earnPerThousand === 1 ? "point" : "points"} for every <span className="num">₦1,000</span> on rooms, food and drink.
                 </>
-              ) : null}
-              .
+              ) : (
+                <>Points come from rooms, food and drink at any of the group&rsquo;s hotels, after check-out.</>
+              )}
             </span>
             {m.memberNumber ? <span className="num">No. {m.memberNumber}</span> : null}
           </footer>
@@ -88,18 +87,20 @@ export function PointsCard({ m, compact = false }: { m: LoyaltyMembershipView; c
 
 /** The year's nights as tally marks in fives, with the next tier's threshold at the end. */
 function Tally({ m }: { m: LoyaltyMembershipView }) {
-  const target = m.next ? m.next.tier.minNights : Math.max(m.tier.minNights, m.nightsThisYear);
   const nights = m.nightsThisYear;
+  const target = m.next ? nights + m.next.nightsToGo : nights;
+  const n = (k: number) => `${k} ${k === 1 ? "night" : "nights"}`;
   const label = m.next
-    ? `${nights} ${nights === 1 ? "night" : "nights"} this year; ${m.next.nightsToGo} more to ${m.next.tier.name}`
-    : `${nights} ${nights === 1 ? "night" : "nights"} this year; the top tier`;
+    ? `${n(nights)} in the last 12 months; ${m.next.nightsToGo} more to ${m.next.name}`
+    : `${n(nights)} in the last 12 months${m.tier ? `; ${m.tier.name} is the top tier` : ""}`;
   // Tally marks read well up to about 30; beyond that a ruled bar says the same thing.
   const marks = target > 0 && target <= 30;
+  if (!target) return <p className="mt-6 text-[13px] text-ink-muted" data-testid="tier-progress">{label}</p>;
   return (
     <div className="mt-6" data-testid="tier-progress">
       <div className="flex items-baseline justify-between gap-3 text-[13px]">
         <span className="text-ink-muted">{label}</span>
-        {m.next ? <span className="kicker !text-[10px]">{m.next.tier.name}</span> : null}
+        {m.next ? <span className="kicker !text-[10px]">{m.next.name}</span> : null}
       </div>
       {marks ? (
         <div className="mt-2.5 flex flex-wrap gap-x-2.5 gap-y-2" role="img" aria-label={label}>

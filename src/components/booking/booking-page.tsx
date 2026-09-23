@@ -45,6 +45,7 @@ export function BookingPage({
             coverImageUrl: hotel.coverImageUrl,
             roomTypes: hotel.roomTypes,
             booking: hotel.booking ?? null,
+            groupName: hotel.group?.name ?? null,
           }}
           site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: APP_NAME }}
           today={today}

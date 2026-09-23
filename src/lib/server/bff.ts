@@ -14,8 +14,11 @@ export const GUEST_PATHS = {
   logout: "public/auth/logout",
 };
 
-/** Routes that take the guest's bearer token (required on /guest, optional on quotes and bookings). */
-const AUTHED = /^(guest\/|public\/quotes$|public\/bookings$)/;
+/**
+ * Routes that take the guest's bearer token (required on /guest; optional on quotes and bookings, and
+ * on a hotel's loyalty programme, which then says whether the guest is a member).
+ */
+const AUTHED = /^(guest\/|public\/quotes$|public\/bookings$|public\/hotels\/[^/]+\/loyalty$)/;
 
 /** Route prefixes the browser may reach through this gateway. */
 const ALLOWED = [/^public\//, /^guest\//];

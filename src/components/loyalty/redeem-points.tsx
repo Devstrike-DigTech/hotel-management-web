@@ -69,7 +69,7 @@ export function RedeemPoints({
     <div className="rounded-sm border border-brass/50 bg-brass/[0.04]" data-testid="points-offer">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3.5">
         <div className="min-w-0 text-sm">
-          <p className="kicker !text-[10px] !text-brass">{offer.programmeName}</p>
+          <p className="kicker flex items-center gap-2 !text-[10px] !text-ink"><span aria-hidden className="size-1.5 rotate-45 bg-brass" />{offer.programmeName}</p>
           <p className="mt-1">
             You have <span className="num font-medium">{formatPoints(offer.balance)}</span> points with {offer.groupName}.
           </p>
@@ -162,7 +162,7 @@ export function PointsToEarn({
         ) : (
           <>
             You will earn <span className="num font-medium">{formatPoints(points)}</span> {programmeName} points on this stay.
-            <span className="block text-[12.5px] text-ink-muted">They arrive after you check out, on what you spend on the room and at the hotel&rsquo;s bars and restaurant.</span>
+            <span className="block text-[12.5px] text-ink-muted">They arrive after you check out. Meals and drinks charged to your room earn more.</span>
           </>
         )}
       </span>

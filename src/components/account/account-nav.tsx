@@ -1,8 +1,8 @@
-import { SuitcaseRolling, UserCircle } from "@phosphor-icons/react";
+import { Diamond, SuitcaseRolling, UserCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 
-/** Heading and the two account tabs: Trips and Profile. */
-export function AccountNav({ current, name }: { current: "trips" | "profile"; name?: string | null }) {
+/** Heading and the account tabs: Trips, Points and Profile. */
+export function AccountNav({ current, name }: { current: "trips" | "points" | "profile"; name?: string | null }) {
   const first = name?.trim().split(/\s+/)[0];
   return (
     <div className="flex flex-wrap items-end justify-between gap-6 border-b border-ink pb-5">
@@ -12,6 +12,10 @@ export function AccountNav({ current, name }: { current: "trips" | "profile"; na
           {current === "trips" ? (
             <>
               {first ? `${first}'s` : "Your"} <em className="accent">trips</em>
+            </>
+          ) : current === "points" ? (
+            <>
+              Your <em className="accent">points</em>
             </>
           ) : (
             <>
@@ -24,6 +28,7 @@ export function AccountNav({ current, name }: { current: "trips" | "profile"; na
         {(
           [
             ["trips", "/trips", "Trips", SuitcaseRolling],
+            ["points", "/account/points", "Points", Diamond],
             ["profile", "/account", "Profile", UserCircle],
           ] as const
         ).map(([k, href, label, Icon]) => (

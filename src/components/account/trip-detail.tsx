@@ -8,7 +8,6 @@ import {
   Phone,
   Receipt,
   Star,
-  WhatsappLogo,
   XCircle,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -26,6 +25,10 @@ import { Notice } from "../ui/field";
 import { useGuestHint } from "./account-link";
 import { CancelDialog } from "./cancel-dialog";
 import { StatusChip } from "./status-chip";
+import { WhatsAppChat } from "../chat/whatsapp-chat";
+import { useHotelChat } from "../chat/use-hotel-chat";
+import { PointsToEarn } from "../loyalty/redeem-points";
+import { JoinProgramme } from "../loyalty/join-programme";
 
 export function TripDetail({ code, appName }: { code: string; appName: string }) {
   const token = useSearchParams().get("t");
@@ -33,6 +36,7 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
   const [booking, setBooking] = useState<BookingView | null>(null);
   const [error, setError] = useState<{ message: string; gone?: boolean } | null>(token ? null : { message: "This page needs the link from your confirmation.", gone: true });
   const [cancelOpen, setCancelOpen] = useState(false);
+  const chat = useHotelChat(booking?.hotel.slug);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -151,6 +155,16 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
             </section>
           ) : null}
 
+          {b.loyalty && b.status !== "CANCELLED" && (b.loyalty.pointsEarned !== null || b.loyalty.pointsToEarn > 0) ? (
+            <PointsToEarn
+              points={b.loyalty.pointsEarned ?? b.loyalty.pointsToEarn}
+              programmeName={b.loyalty.programme}
+              state={b.loyalty.pointsEarned !== null ? "earned" : "pending"}
+            />
+          ) : null}
+
+          {signedIn && b.status !== "CANCELLED" ? <JoinProgramme hotelSlug={b.hotel.slug} hotelName={b.hotel.name} /> : null}
+
           {b.review.eligible && b.review.token && !b.review.submitted ? (
             <section className="rounded-md border border-brass/50 bg-brass/[0.06] p-5">
               <Star size={22} weight="fill" className="text-brass" aria-hidden />
@@ -178,11 +192,11 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
                       <Phone size={18} weight="light" className="text-laterite" aria-hidden /> <span className="num">{formatPhone(b.hotel.phone)}</span>
                     </a>
                   </li>
-                  <li>
-                    <a href={`https://wa.me/${phone}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
-                      <WhatsappLogo size={18} weight="light" className="text-laterite" aria-hidden /> Message on WhatsApp
-                    </a>
-                  </li>
+                  {chat ? (
+                    <li>
+                      <WhatsAppChat number={chat} hotelName={b.hotel.name} code={b.code} variant="row" />
+                    </li>
+                  ) : null}
                 </>
               ) : null}
               <li>

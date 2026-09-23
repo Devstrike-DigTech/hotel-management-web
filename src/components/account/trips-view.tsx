@@ -7,6 +7,7 @@ import type { TripSummary } from "@/lib/booking-types";
 import { call, getClockSkew, humanError } from "@/lib/client-api";
 import { formatMonthShort, formatShort, formatWeekday } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
+import { formatPoints } from "@/lib/loyalty";
 import { EmptyRack } from "../marketing/illustrations";
 import { HoldCountdown } from "../booking/hold-countdown";
 import { Notice } from "../ui/field";
@@ -144,6 +145,12 @@ function TripRow({ trip: t }: { trip: TripSummary }) {
           <p className="text-xs text-ink-muted">
             {dim ? "" : t.outstandingKobo > 0 ? `${formatNaira(t.outstandingKobo)} at the hotel` : t.paidKobo > 0 ? "Paid" : ""}
           </p>
+          {t.pointsEarned ? (
+            <p className="num mt-0.5 inline-flex items-center gap-1.5 text-xs text-ink" data-testid="trip-points">
+              <span aria-hidden className="size-1.5 rotate-45 bg-brass" />
+              +{formatPoints(t.pointsEarned)} points
+            </p>
+          ) : null}
         </div>
         {t.canReview && !t.reviewed ? (
           <span className="relative z-10 mt-2 inline-flex items-center gap-1.5 rounded-full border border-brass/60 px-2.5 py-1 text-xs text-ink">

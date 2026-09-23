@@ -1,9 +1,9 @@
-import { formatPoints, type StatementEntryView, type StatementKind } from "@/lib/loyalty";
+import type { LoyaltyTxnType } from "@/lib/booking-types";
+import { formatPoints, type StatementEntryView } from "@/lib/loyalty";
 import { formatLagosShort } from "@/lib/time";
 
-const KIND: Record<StatementKind, string> = {
+const KIND: Record<LoyaltyTxnType, string> = {
   EARN: "Earned",
-  BONUS: "Bonus",
   REDEEM: "Used",
   ADJUST: "Adjusted",
   EXPIRE: "Expired",
