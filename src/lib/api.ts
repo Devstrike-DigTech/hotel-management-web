@@ -112,7 +112,7 @@ export async function settle<T>(p: Promise<T>): Promise<{ data: T; error: null }
 
 /** Fetches every listed hotel (the marketplace is small in M1). Falls back to paging if the API caps pageSize. */
 export async function allHotels(q: Omit<HotelQuery, "page" | "pageSize"> = {}): Promise<HotelCard[]> {
-  const pageSize = 50;
+  const pageSize = 48; // the API caps pageSize at 48
   const first = await api.hotels({ ...q, page: 1, pageSize });
   const items = [...first.items];
   const size = first.pageSize || pageSize;
