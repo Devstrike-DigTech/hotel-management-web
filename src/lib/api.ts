@@ -1,0 +1,125 @@
+import "server-only";
+import { API_URL } from "./env";
+import type {
+  ApiErrorBody,
+  AppInfo,
+  City,
+  Feature,
+  HotelCard,
+  HotelDetail,
+  HotelQuery,
+  Paginated,
+  Plan,
+} from "./types";
+
+/** Typed client for the public API. Server-only: pages fetch on the server for SEO. */
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly details?: Record<string, unknown>;
+
+  constructor(status: number, body: Partial<ApiErrorBody> | null, fallback: string) {
+    super(body?.message || fallback);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = body?.code || (status === 0 ? "NETWORK_ERROR" : `HTTP_${status}`);
+    this.details = body?.details;
+  }
+}
+
+interface RequestOptions {
+  /** Seconds to cache the response in the Next data cache. `false` disables caching. */
+  revalidate?: number | false;
+  tags?: string[];
+  timeoutMs?: number;
+}
+
+async function request<T>(path: string, { revalidate = 60, tags, timeoutMs = 8000 }: RequestOptions = {}): Promise<T> {
+  const url = `${API_URL}/api/v1${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+      ...(revalidate === false ? { cache: "no-store" as const } : { next: { revalidate, tags } }),
+    });
+  } catch (err) {
+    throw new ApiError(0, null, `Could not reach the API at ${url}: ${(err as Error).message}`);
+  }
+  if (!res.ok) {
+    let body: Partial<ApiErrorBody> | null = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* non-JSON error */
+    }
+    throw new ApiError(res.status, body, `${res.status} ${res.statusText} for ${path}`);
+  }
+  return (await res.json()) as T;
+}
+
+function qs(params: Record<string, string | number | undefined | null>) {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
+  }
+  const out = s.toString();
+  return out ? `?${out}` : "";
+}
+
+export const api = {
+  app: () => request<AppInfo>("/public/app", { revalidate: 3600 }),
+  plans: () => request<Plan[]>("/public/plans", { revalidate: 300, tags: ["plans"] }),
+  features: () => request<Feature[]>("/public/features", { revalidate: 300, tags: ["features"] }),
+  cities: () => request<City[]>("/public/cities", { revalidate: 300, tags: ["cities"] }),
+  hotels: (q: HotelQuery = {}) =>
+    request<Paginated<HotelCard>>(`/public/hotels${qs({ ...q })}`, { revalidate: 60, tags: ["hotels"] }),
+  /** Returns null when the hotel does not exist (404). */
+  hotel: async (slug: string): Promise<HotelDetail | null> => {
+    try {
+      return await request<HotelDetail>(`/public/hotels/${encodeURIComponent(slug)}`, {
+        revalidate: 60,
+        tags: ["hotels", `hotel:${slug}`],
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+  resolveHost: async (host: string): Promise<{ slug: string } | null> => {
+    try {
+      return await request<{ slug: string }>(`/public/resolve-host${qs({ host })}`, { revalidate: false, timeoutMs: 3000 });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+};
+
+/** Settles a request into a result instead of throwing, so a page can degrade gracefully when the API is down. */
+export async function settle<T>(p: Promise<T>): Promise<{ data: T; error: null } | { data: null; error: ApiError }> {
+  try {
+    return { data: await p, error: null };
+  } catch (err) {
+    const e = err instanceof ApiError ? err : new ApiError(0, null, (err as Error).message);
+    if (process.env.NODE_ENV !== "production" || e.status >= 500 || e.status === 0) {
+      console.error(`[api] ${e.code}: ${e.message}`);
+    }
+    return { data: null, error: e };
+  }
+}
+
+/** Fetches every listed hotel (the marketplace is small in M1). Falls back to paging if the API caps pageSize. */
+export async function allHotels(q: Omit<HotelQuery, "page" | "pageSize"> = {}): Promise<HotelCard[]> {
+  const pageSize = 50;
+  const first = await api.hotels({ ...q, page: 1, pageSize });
+  const items = [...first.items];
+  const size = first.pageSize || pageSize;
+  const pages = Math.min(Math.ceil(first.total / size), 10);
+  for (let page = 2; page <= pages; page++) {
+    const next = await api.hotels({ ...q, page, pageSize });
+    items.push(...next.items);
+  }
+  return items;
+}
