@@ -69,6 +69,8 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` | Canonical URLs, sitemap, `metadataBase` |
 | `NEXT_PUBLIC_ADMIN_URL` | `http://localhost:3001` | Hotel sign-in and signup CTAs (`/signup?plan=<code>`) |
 | `MARKETPLACE_HOSTS` | `staging.example.com` | Optional. Extra hosts that should serve the marketplace |
+| `TRUSTED_PROXY_SECRET` | a long random string | Server-only. Sent as `X-Proxy-Auth` with the visitor's `X-Client-IP`; must equal the backend's value (see "Trusted client address") |
+| `CLIENT_IP_HEADER` | `cf-connecting-ip` | Optional. A header your host sets with the visitor's address that clients cannot forge |
 
 `NEXT_PUBLIC_*` values are inlined at build time, so rebuild after changing them.
 
@@ -316,7 +318,7 @@ forwards only `public/*` and `guest/*` routes:
   bookings, refreshes once on a 401 and rotates the cookies. Refreshes are single-flight and remembered for a
   minute, so parallel requests never present a rotated refresh token twice (which would revoke the login).
   A readable `guest_hint` cookie holds only the first name, for the header's "Trips" link.
-- It forwards the last `X-Forwarded-For` hop (the one our own edge proxy appends) for the backend's per-IP limits.
+- It tells the backend who the visitor is with `X-Client-IP` and `X-Proxy-Auth` (see "Trusted client address").
 - `src/proxy.ts` serves `/api/*`, `/pay/mock` and `/dev/*` as is on hotel hosts.
 
 ### Built for patchy mobile data
@@ -373,6 +375,4 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
 
 - Paystack Inline (the popup, using `accessCode`) is not used; the flow redirects to the hosted checkout, which
   is sturdier on low-end phones and in in-app browsers.
-- Server-side calls to cached public endpoints come from the web server's address; the gateway forwards the
-  guest's address for everything the browser calls.
 - Amenity filtering is still done in this app, as `GET /public/hotels` does not take amenities.

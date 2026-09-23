@@ -1,5 +1,7 @@
 import "server-only";
+import { headers } from "next/headers";
 import { API_URL } from "./env";
+import { clientIpFrom, trustedProxyHeaders } from "./server/client-ip";
 import type { BookingConfig, ReviewPage } from "./booking-types";
 import type {
   ApiErrorBody,
@@ -36,12 +38,26 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
+/**
+ * The visitor's address, for uncached calls made while rendering their request. Cached responses
+ * are shared by every visitor (and the Next data cache keys on request headers), so those carry
+ * only the proxy credential, never one visitor's address.
+ */
+async function visitorIp(): Promise<string | null> {
+  try {
+    return clientIpFrom(await headers());
+  } catch {
+    return null; // outside a request (build, background revalidation)
+  }
+}
+
 async function request<T>(path: string, { revalidate = 60, tags, timeoutMs = 8000 }: RequestOptions = {}): Promise<T> {
   const url = `${API_URL}/api/v1${path}`;
+  const trusted = trustedProxyHeaders(revalidate === false ? await visitorIp() : null);
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", ...trusted },
       signal: AbortSignal.timeout(timeoutMs),
       ...(revalidate === false ? { cache: "no-store" as const } : { next: { revalidate, tags } }),
     });

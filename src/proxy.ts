@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { clientIpFrom, stripTrustedHeaders, trustedProxyHeaders } from "./lib/server/client-ip";
 
 /**
  * Multi-tenant host routing (Next 16 "proxy", formerly middleware; runs on Node.js).
@@ -10,7 +11,8 @@ import { NextResponse, type NextRequest } from "next/server";
  *   /api/*, /pay/mock, /dev/* on any host         -> served as is (API gateway and dev tools)
  *
  * The microsite layout reads `x-site-base` to build its own links: "" on a hotel host,
- * "/h/{slug}" on the path fallback.
+ * "/h/{slug}" on the path fallback. Client copies of the trusted-proxy headers (X-Client-IP,
+ * X-Proxy-Auth) are dropped on every route; only the server adds them, on its way to the backend.
  */
 
 const APP_DOMAIN = (process.env.NEXT_PUBLIC_APP_DOMAIN || "hotelos.ng").toLowerCase();
@@ -58,7 +60,7 @@ function subdomainOf(host: string) {
   return null;
 }
 
-async function resolveSlug(host: string): Promise<string | null> {
+async function resolveSlug(host: string, clientIp: string | null): Promise<string | null> {
   const hit = cache.get(host);
   if (hit && hit.expires > Date.now()) return hit.slug;
 
@@ -67,7 +69,7 @@ async function resolveSlug(host: string): Promise<string | null> {
   const lookup = sub ? `${sub}.${APP_DOMAIN}` : host;
   try {
     const res = await fetch(`${API_URL}/api/v1/public/resolve-host?host=${encodeURIComponent(lookup)}`, {
-      headers: { accept: "application/json" },
+      headers: { accept: "application/json", ...trustedProxyHeaders(clientIp) },
       signal: AbortSignal.timeout(2500),
     });
     if (res.ok) {
@@ -90,6 +92,7 @@ function rewriteToSite(req: NextRequest, slug: string, base: string, rest: strin
   const url = req.nextUrl.clone();
   url.pathname = `/h/${slug}${rest === "/" ? "" : rest}`;
   const headers = new Headers(req.headers);
+  stripTrustedHeaders(headers);
   headers.set("x-site-base", base);
   headers.set("x-site-slug", slug);
   return NextResponse.rewrite(url, { request: { headers } });
@@ -107,13 +110,18 @@ export async function proxy(req: NextRequest) {
     const headers = new Headers(req.headers);
     headers.delete("x-site-base");
     headers.delete("x-site-slug");
+    stripTrustedHeaders(headers);
     return NextResponse.next({ request: { headers } });
   }
 
   // Shared, host-agnostic routes: the same-origin API gateway and the dev-only payment and mail tools.
-  if (SHARED.test(pathname)) return NextResponse.next();
+  if (SHARED.test(pathname)) {
+    const headers = new Headers(req.headers);
+    stripTrustedHeaders(headers);
+    return NextResponse.next({ request: { headers } });
+  }
 
-  const slug = await resolveSlug(host);
+  const slug = await resolveSlug(host, clientIpFrom(req.headers));
   if (!slug) {
     const url = req.nextUrl.clone();
     url.pathname = "/h/__unknown-host";

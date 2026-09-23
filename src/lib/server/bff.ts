@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { API_URL } from "../env";
+import { clientIpFrom, gatewayHeaders, visitorHeaders } from "./client-ip";
 
 /**
  * The browser's gateway to the backend (see app/api/v1/[...path]/route.ts).
@@ -47,7 +48,7 @@ function refreshOnce(refreshToken: string, clientIp: string | null): Promise<Tok
     try {
       const res = await fetch(`${API_URL}/api/v1/${GUEST_PATHS.refresh}`, {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json", ...(clientIp ? { "x-forwarded-for": clientIp } : {}) },
+        headers: { "content-type": "application/json", accept: "application/json", ...visitorHeaders(clientIp) },
         body: JSON.stringify({ refreshToken }),
         signal: AbortSignal.timeout(10_000),
       });
@@ -86,16 +87,11 @@ function firstNameIn(json: Record<string, unknown>): string | null {
   return null;
 }
 
-/**
- * The caller's address for the backend's per-IP limits. The last X-Forwarded-For hop is the one
- * our own edge proxy appended, so a client cannot choose its own by sending the header.
- */
+/** The visitor's address (see ./client-ip.ts for which header is believed). */
 function clientIpOf(req: NextRequest) {
-  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((h) => h.trim()).filter(Boolean);
-  return hops.at(-1) || req.headers.get("x-real-ip") || null;
+  return clientIpFrom(req.headers);
 }
 
-const PASS_REQUEST = ["content-type", "accept", "idempotency-key", "user-agent", "accept-language"];
 const PASS_RESPONSE = ["content-type", "content-disposition", "cache-control", "idempotent-replayed", "retry-after", "date", "etag"];
 
 export async function forward(req: NextRequest, segments: string[]) {
@@ -111,18 +107,8 @@ export async function forward(req: NextRequest, segments: string[]) {
   const body = req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer();
   const url = `${API_URL}/api/v1/${path}${req.nextUrl.search}`;
 
-  const send = (token: string | null) => {
-    const h = new Headers();
-    for (const k of PASS_REQUEST) {
-      const v = req.headers.get(k);
-      if (v) h.set(k, v);
-    }
-    if (ip) h.set("x-forwarded-for", ip);
-    const auth = req.headers.get("authorization");
-    if (auth) h.set("authorization", auth);
-    else if (token) h.set("authorization", `Bearer ${token}`);
-    return fetch(url, { method: req.method, headers: h, body, signal: AbortSignal.timeout(20_000), cache: "no-store" });
-  };
+  const send = (token: string | null) =>
+    fetch(url, { method: req.method, headers: gatewayHeaders(req.headers, token), body, signal: AbortSignal.timeout(20_000), cache: "no-store" });
 
   let upstream: Response;
   let rotated: Tokens | null = null;
@@ -190,7 +176,7 @@ export async function signOut(req: NextRequest) {
     try {
       await fetch(`${API_URL}/api/v1/${GUEST_PATHS.logout}`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...(access ? { authorization: `Bearer ${access}` } : {}), ...(clientIpOf(req) ? { "x-forwarded-for": clientIpOf(req)! } : {}) },
+        headers: { "content-type": "application/json", ...(access ? { authorization: `Bearer ${access}` } : {}), ...visitorHeaders(clientIpOf(req)) },
         body: JSON.stringify({ refreshToken: refresh }),
         signal: AbortSignal.timeout(5000),
       });
