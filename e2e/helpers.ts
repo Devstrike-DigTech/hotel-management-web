@@ -12,9 +12,14 @@ export function addDays(d: string, n: number) {
 
 /** A stay far enough out, and spread across runs, so tests do not compete for the same rooms. */
 export function futureStay(nights = 2) {
-  const offset = 60 + Math.floor(Math.random() * 240);
-  const checkIn = addDays(lagosToday(), offset);
-  return { checkIn, checkOut: addDays(checkIn, nights) };
+  for (;;) {
+    const offset = 60 + Math.floor(Math.random() * 240);
+    const checkIn = addDays(lagosToday(), offset);
+    const checkOut = addDays(checkIn, nights);
+    // Skip the festive season: the seed's Detty December rules set minimum stays and close arrivals.
+    const festive = (d: string) => d.slice(5) >= "12-10" || d.slice(5) <= "01-06";
+    if (!festive(checkIn) && !festive(checkOut)) return { checkIn, checkOut };
+  }
 }
 
 /** A fresh Nigerian mobile number per test, so per-phone limits never collide across runs. */
