@@ -82,6 +82,9 @@ export interface RoomTypePublic {
   amenities: string[];
   images: ImageRef[];
   availableCount: number;
+  /* M4, additive: rate plans sold online for this room type, and the cheapest coming nightly rate. */
+  ratePlans?: import("./rates").RawPlan[];
+  fromKobo?: number | null;
 }
 
 export interface HotelDetail extends HotelCard {

@@ -425,6 +425,15 @@
   animation: shimmer 1.6s linear infinite;
 }
 
+/* Closed-to-arrival days in the price calendar: a quiet hairline hatch, like a ruled-off ledger cell. */
+@utility day-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in oklab, var(--ink-muted) 22%, transparent) 5px 6px
+  );
+}
+
 @utility container-page {
   width: 100%;
   max-width: 86rem;

@@ -3,7 +3,7 @@
 import { CalendarBlank } from "@phosphor-icons/react";
 import { useCallback, useRef, useState } from "react";
 import { formatShort, type ISODate } from "@/lib/dates";
-import { nightsLabel, RangeCalendar, type Range } from "./range-calendar";
+import { nightsLabel, RangeCalendar, type PriceCalendarState, type Range } from "./range-calendar";
 import { useDismiss, useMedia } from "./use-dismiss";
 
 interface Props {
@@ -13,9 +13,12 @@ interface Props {
   /** "bar" renders two segments for the search ledger; "stack" renders a boxed pair for side panels. */
   variant?: "bar" | "stack";
   align?: "left" | "right";
+  /** The hotel's price calendar, on a hotel page. */
+  prices?: PriceCalendarState;
+  onVisibleChange?: (from: ISODate, to: ISODate) => void;
 }
 
-export function DateRangeField({ value, onChange, today, variant = "bar", align = "left" }: Props) {
+export function DateRangeField({ value, onChange, today, variant = "bar", align = "left", prices, onVisibleChange }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -73,7 +76,7 @@ export function DateRangeField({ value, onChange, today, variant = "bar", align 
           } ${!wide ? "!w-[calc(100vw-2rem)] max-w-sm" : ""}`}
           style={{ animationDuration: "220ms" }}
         >
-          <RangeCalendar value={value} onChange={onChange} today={today} months={wide ? 2 : 1} />
+          <RangeCalendar value={value} onChange={onChange} today={today} months={wide ? 2 : 1} prices={prices} onVisibleChange={onVisibleChange} />
           <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
             <p className="flex items-center gap-2 text-sm text-ink-muted" aria-live="polite">
               <CalendarBlank size={16} aria-hidden />

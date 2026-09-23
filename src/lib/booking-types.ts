@@ -1,4 +1,5 @@
 /** Types for the M3 guest API (scratchpad API-M3.md). Money is integer kobo; dates are Lagos ISO dates. */
+import type { RawLivePlan, RawPlan } from "./rates";
 import type { RoomTypePublic } from "./types";
 
 export type BookingChannel = "MARKETPLACE" | "BOOKING_SITE";
@@ -21,6 +22,8 @@ export interface CancellationPolicy {
   lateCancellationFeePct: number;
   noShowFeePct: number;
   summary: string;
+  /* M4 */
+  nonRefundable?: boolean;
 }
 
 export interface TaxLine {
@@ -43,6 +46,12 @@ export interface PriceBreakdown {
   taxTotalKobo: number;
   totalKobo: number;
   firstNightTotalKobo: number;
+  /* M4, additive */
+  nightly?: { date: string; rateKobo: number; discountKobo: number; ruleName: string | null }[];
+  averageNightlyKobo?: number;
+  ratePlan?: { id: string; code: string; name: string; kind: string; includesBreakfast: boolean; refundable: boolean } | null;
+  promo?: { code: string; description: string; type: string; discountKobo: number } | null;
+  discountLines?: { date: string; description: string; amountKobo: number }[];
 }
 
 export interface HotelMini {
@@ -132,6 +141,9 @@ export interface RoomTypeAvailability {
   unavailableReason: "SOLD_OUT" | "CAPACITY" | "NO_HOURLY_RATE" | "ONLINE_BOOKING_DISABLED" | null;
   lowAvailability: boolean;
   quote: PriceBreakdown | null;
+  /* M4 */
+  ratePlans?: RawLivePlan[];
+  restriction?: { reason: "CLOSED_TO_ARRIVAL" | "CLOSED_TO_DEPARTURE" | "STOP_SELL" | "MIN_NIGHTS"; date: string; minNights?: number } | null;
 }
 
 export interface HotelAvailability {
@@ -187,6 +199,9 @@ export interface Quote {
   freeCancellationUntil: string | null;
   holdMinutes: number;
   available: number;
+  /* M4 */
+  ratePlan?: RawPlan | null;
+  promo?: { code: string; description?: string | null; discountKobo: number } | null;
 }
 
 export interface PaymentInit {
@@ -245,6 +260,9 @@ export interface BookingView {
   };
   review: { eligible: boolean; submitted: boolean; token: string | null; deadline: string | null };
   createdAt: string;
+  /* M4 */
+  ratePlan?: { code: string; name: string; includesBreakfast: boolean; refundable: boolean } | null;
+  promo?: { code: string; discountKobo: number } | null;
 }
 
 export interface BookingCreated {
