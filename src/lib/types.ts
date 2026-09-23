@@ -1,4 +1,5 @@
 /** Types mirroring the public API contract (see BRIEF: "Public (no auth)"). All money is integer kobo. */
+import type { HotelBookingInfo, ReviewSummary, SearchAvailability } from "./booking-types";
 
 export interface ApiErrorBody {
   statusCode: number;
@@ -56,6 +57,12 @@ export interface HotelCard {
   reviewCount: number;
   amenities: string[];
   featured: boolean;
+  /* M3, additive: optional so pages still render against an older API. */
+  onlinePayment?: boolean;
+  payAtHotel?: boolean;
+  onlineBookingEnabled?: boolean;
+  freeCancellationHours?: number;
+  searchAvailability?: SearchAvailability | null;
 }
 
 export interface ImageRef {
@@ -88,6 +95,10 @@ export interface HotelDetail extends HotelCard {
   roomTypes: RoomTypePublic[];
   policies: string[];
   branding: { accentColor: string | null; logoUrl: string | null };
+  /* M3, additive */
+  mapUrl?: string;
+  booking?: HotelBookingInfo;
+  reviewSummary?: ReviewSummary;
 }
 
 export interface Paginated<T> {
@@ -103,6 +114,9 @@ export interface HotelQuery {
   guests?: number;
   minPriceKobo?: number;
   maxPriceKobo?: number;
+  checkIn?: string;
+  checkOut?: string;
+  sort?: "recommended" | "price_asc" | "price_desc" | "rating";
   page?: number;
   pageSize?: number;
 }

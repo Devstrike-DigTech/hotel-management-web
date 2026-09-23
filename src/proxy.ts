@@ -7,6 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  *   {slug}.APP_DOMAIN, {slug}.localhost          -> hotel microsite  (rewrite to /h/{slug}/...)
  *   any other host (verified custom domain)      -> hotel microsite  (slug from GET /public/resolve-host)
  *   /h/{slug}/... on any root host               -> hotel microsite  (path fallback for local dev)
+ *   /api/*, /pay/mock, /dev/* on any host         -> served as is (API gateway and dev tools)
  *
  * The microsite layout reads `x-site-base` to build its own links: "" on a hotel host,
  * "/h/{slug}" on the path fallback.
@@ -20,6 +21,9 @@ const EXTRA_ROOTS = (process.env.MARKETPLACE_HOSTS || "")
   .map((h) => h.trim().toLowerCase())
   .filter(Boolean);
 const RESERVED = new Set(["www", "app", "admin", "api", "docs", "mail", "static", "assets"]);
+
+/** Routes every host serves as is: the API gateway, and the dev-only mock checkout and mailbox. */
+const SHARED = /^\/(api\/|pay\/mock(\/|$)|dev\/)/;
 
 type Entry = { slug: string | null; expires: number };
 const cache = new Map<string, Entry>();
@@ -105,6 +109,9 @@ export async function proxy(req: NextRequest) {
     headers.delete("x-site-slug");
     return NextResponse.next({ request: { headers } });
   }
+
+  // Shared, host-agnostic routes: the same-origin API gateway and the dev-only payment and mail tools.
+  if (SHARED.test(pathname)) return NextResponse.next();
 
   const slug = await resolveSlug(host);
   if (!slug) {

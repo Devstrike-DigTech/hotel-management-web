@@ -1,5 +1,6 @@
 import "server-only";
 import { API_URL } from "./env";
+import type { BookingConfig, ReviewPage } from "./booking-types";
 import type {
   ApiErrorBody,
   AppInfo,
@@ -87,6 +88,12 @@ export const api = {
       throw err;
     }
   },
+  bookingConfig: () => request<BookingConfig>("/public/booking-config", { revalidate: 300 }),
+  reviews: (slug: string, q: { travellerType?: string; sort?: string; page?: number; pageSize?: number } = {}) =>
+    request<ReviewPage>(`/public/hotels/${encodeURIComponent(slug)}/reviews${qs({ ...q })}`, {
+      revalidate: 60,
+      tags: ["reviews", `reviews:${slug}`],
+    }),
   resolveHost: async (host: string): Promise<{ slug: string } | null> => {
     try {
       return await request<{ slug: string }>(`/public/resolve-host${qs({ host })}`, { revalidate: false, timeoutMs: 3000 });
