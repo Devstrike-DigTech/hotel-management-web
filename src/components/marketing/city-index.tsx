@@ -14,7 +14,7 @@ function stateLabel(state: string) {
  */
 export function CityIndex({ cities, hotels }: { cities: City[]; hotels: HotelCard[] }) {
   return (
-    <ul className="grid gap-x-6 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-6 pt-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-x-6 sm:gap-y-7 sm:overflow-visible sm:p-0 lg:grid-cols-3">
       {cities.map((c, i) => {
         const inCity = hotels.filter((h) => h.city === c.name);
         const areas = [...new Set(inCity.map((h) => h.area))].slice(0, 3);
@@ -23,7 +23,7 @@ export function CityIndex({ cities, hotels }: { cities: City[]; hotels: HotelCar
           null,
         );
         return (
-          <li key={c.name}>
+          <li key={c.name} className="w-[84%] shrink-0 snap-center sm:w-auto">
             <Link
               href={`/stays?city=${encodeURIComponent(c.name)}`}
               aria-label={`${c.name}, ${stateLabel(c.state)}: ${c.hotelCount} ${c.hotelCount === 1 ? "hotel" : "hotels"}`}

@@ -59,7 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-dvh">
-        <a href="#main" className="btn btn-ink fixed left-3 top-3 z-[200] -translate-y-24 focus:translate-y-0">
+        <a href="#main" className="btn btn-ink sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[200]">
           Skip to content
         </a>
         {children}

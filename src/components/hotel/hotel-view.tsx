@@ -15,7 +15,7 @@ import { AmenityIcon } from "../ui/amenity";
 import { Gallery } from "./gallery";
 import { Rating } from "./rating";
 import { RoomList } from "./room-list";
-import { StayCard, StayProvider } from "./stay-context";
+import { MobileBookBar, StayCard, StayProvider } from "./stay-context";
 
 interface Props {
   hotel: HotelDetail;
@@ -39,7 +39,7 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
 
   return (
     <StayProvider initial={initial} today={today} bookBase={bookBase}>
-      <div className="container-page pt-8 lg:pt-10">
+      <div className="container-page pb-16 pt-8 lg:pb-0 lg:pt-10">
         {variant === "marketplace" ? (
           <nav aria-label="Breadcrumb" className="kicker flex flex-wrap items-center gap-2">
             <Link href="/stays" className="hover:text-ink">
@@ -56,6 +56,42 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
           </nav>
         ) : null}
 
+        {variant === "microsite" ? (
+          <header className="mx-auto mt-6 flex max-w-4xl flex-col items-center text-center sm:mt-10">
+            <span aria-hidden className="adire-rule mb-8 max-w-[14rem] text-laterite/60" />
+            <p className="kicker">
+              Welcome to {hotel.area}, {placeName(hotel.city, hotel.state)}
+            </p>
+            <h1 className="display mt-5 text-[clamp(3rem,9vw,7.4rem)]">
+              <span className="reveal-line">
+                <span>{hotel.name}</span>
+              </span>
+            </h1>
+            {hotel.tagline ? (
+              <p className="fade-up mt-5 max-w-2xl font-display text-[clamp(1.25rem,2.4vw,1.8rem)] italic leading-snug text-laterite [--d:200ms]">
+                {hotel.tagline}
+              </p>
+            ) : null}
+            <div className="mt-8 w-full max-w-md">
+          <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-line bg-line text-sm text-left">
+            <div className="bg-paper p-3">
+              <dt className="kicker !text-[10px]">Reviews</dt>
+              <dd className="mt-1.5">
+                <Rating rating={hotel.rating} reviewCount={hotel.reviewCount} compact />
+              </dd>
+            </div>
+            <div className="bg-paper p-3">
+              <dt className="kicker !text-[10px]">Check in</dt>
+              <dd className="num mt-1.5">{formatClock(hotel.checkInTime)}</dd>
+            </div>
+            <div className="bg-paper p-3">
+              <dt className="kicker !text-[10px]">Check out</dt>
+              <dd className="num mt-1.5">{formatClock(hotel.checkOutTime)}</dd>
+            </div>
+          </dl>
+            </div>
+          </header>
+        ) : (
         <header className={`grid gap-6 lg:grid-cols-12 lg:items-end ${variant === "marketplace" ? "mt-8" : "mt-4"}`}>
           <div className="lg:col-span-8">
             <p className="kicker flex items-center gap-2">
@@ -90,6 +126,7 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
             </div>
           </dl>
         </header>
+        )}
 
         <div className="fade-up mt-8 [--d:150ms]">
           <Gallery images={images} name={hotel.name} />
@@ -109,9 +146,9 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
             {hotel.amenities.length ? (
               <section aria-labelledby="amenities-title" className="mt-14">
                 <SectionHead n={2} id="amenities-title" title="What's here" />
-                <ul className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-line bg-line sm:grid-cols-3">
+                <ul className="mt-6 grid grid-cols-2 overflow-hidden rounded-sm border-l border-t border-line sm:grid-cols-3">
                   {hotel.amenities.map((a) => (
-                    <li key={a} className="flex items-center gap-3 bg-paper px-4 py-4 text-[0.9375rem]">
+                    <li key={a} className="flex items-center gap-3 border-b border-r border-line px-4 py-4 text-[0.9375rem]">
                       <AmenityIcon label={a} size={22} className="shrink-0 text-laterite" />
                       {a}
                     </li>
@@ -212,6 +249,7 @@ export function HotelView({ hotel, today, initial, bookBase, variant }: Props) {
           </aside>
         </div>
       </div>
+      <MobileBookBar fromKobo={from} />
     </StayProvider>
   );
 }

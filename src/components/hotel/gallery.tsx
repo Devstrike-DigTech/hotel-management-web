@@ -122,7 +122,7 @@ function Lightbox({
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 sm:px-20">
         <figure className="relative h-full w-full">
           <div className="relative h-[calc(100%-3rem)] w-full">
-            <Plate key={img.url} src={img.url} alt={img.alt} label={img.alt} sizes="100vw" className="absolute inset-0 !bg-transparent" imgClassName="!object-contain" />
+            <Plate key={img.url} src={img.url} alt={img.alt} caption={false} sizes="100vw" className="absolute inset-0 !bg-transparent" imgClassName="!object-contain" />
           </div>
           <figcaption className="flex h-12 items-center justify-center text-center font-display text-sm italic opacity-75">{img.alt}</figcaption>
         </figure>
@@ -157,7 +157,7 @@ function Lightbox({
               aria-current={i === index}
               className={`relative block h-12 w-16 overflow-hidden rounded-xs transition-opacity ${i === index ? "opacity-100 ring-1 ring-[#e0714b] ring-offset-2 ring-offset-[#0e0d0b]" : "opacity-45 hover:opacity-80"}`}
             >
-              <Plate src={im.url} alt="" sizes="64px" className="absolute inset-0" />
+              <Plate src={im.url} alt="" caption={false} sizes="64px" className="absolute inset-0" />
             </button>
           </li>
         ))}

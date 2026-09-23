@@ -27,13 +27,15 @@ interface PlateProps {
   imgClassName?: string;
   /** Text shown on the patterned fallback when the photo is missing or fails to load. */
   label?: string;
+  /** Show the caption chip on the fallback (off for small thumbnails). */
+  caption?: boolean;
 }
 
 /**
  * A photograph mounted like a printed plate. While loading, or if the image cannot be
  * fetched, the frame shows a quiet adire field instead of a broken image.
  */
-const TONES = ["var(--laterite)", "var(--palm)", "var(--adire)", "var(--brass)", "var(--ochre)"];
+const TONES = ["var(--laterite)", "var(--ochre)", "var(--brass)", "var(--palm)", "var(--laterite)", "var(--brass)"];
 
 function toneFor(seed: string) {
   let h = 0;
@@ -41,7 +43,7 @@ function toneFor(seed: string) {
   return TONES[h % TONES.length];
 }
 
-export function Plate({ src, alt, sizes, priority, className = "", imgClassName = "", label }: PlateProps) {
+export function Plate({ src, alt, sizes, priority, className = "", imgClassName = "", label, caption = true }: PlateProps) {
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
   const showImage = !!src && state !== "error";
 
@@ -49,10 +51,10 @@ export function Plate({ src, alt, sizes, priority, className = "", imgClassName 
     <div
       className={`${/\b(absolute|fixed)\b/.test(className) ? "" : "relative "}overflow-hidden ${className}`}
       {...(!showImage ? { role: "img", "aria-label": alt } : {})}
-      style={{ "--tone": toneFor(label ?? alt), backgroundColor: "color-mix(in oklab, var(--tone) 13%, var(--surface-2))" } as React.CSSProperties}
+      style={{ "--tone": toneFor(label ?? alt), backgroundColor: "color-mix(in oklab, var(--tone) 17%, var(--surface-2))" } as React.CSSProperties}
     >
-      <div aria-hidden className="adire-field absolute inset-0 text-[color:var(--tone)] opacity-[0.22]" />
-      {state !== "loaded" && (label || !src || state === "error") ? (
+      <div aria-hidden className="adire-field absolute inset-0 text-[color:var(--tone)] opacity-[0.28]" />
+      {caption && (label ?? alt).trim() && state !== "loaded" && (label || !src || state === "error") ? (
         <div aria-hidden className="absolute inset-x-0 bottom-0 flex items-end p-3">
           <span className="kicker truncate rounded-xs bg-paper/85 px-1.5 py-0.5 !text-[10px] !text-ink">{label ?? alt}</span>
         </div>

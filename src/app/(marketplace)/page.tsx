@@ -50,7 +50,7 @@ export default async function HomePage() {
               <span aria-hidden className="h-px w-8 bg-line-strong" />
               <span>Independent hotels across Nigeria</span>
             </p>
-            <h1 className="display mt-6 text-[clamp(3.1rem,9.2vw,8.4rem)]">
+            <h1 className="display mt-6 text-[clamp(3.4rem,12vw,8.4rem)] lg:text-[clamp(3.4rem,9.2vw,8.4rem)]">
               <span className="reveal-line">
                 <span style={{ "--d": "80ms" } as React.CSSProperties}>Good rooms,</span>
               </span>

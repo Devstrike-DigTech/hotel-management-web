@@ -118,7 +118,7 @@ export function RangeCalendar({ value, onChange, today, months = 2, max = addDay
         >
           <CaretLeft size={16} />
         </button>
-        <p className="kicker !text-ink" aria-live="polite">
+        <p className="sr-only" aria-live="polite">
           {Array.from({ length: months }, (_, i) => formatMonth(addMonths(view, i))).join("  /  ")}
         </p>
         <button

@@ -96,3 +96,22 @@ export function SelectRoomLink({ roomId, soldOut, name }: { roomId: string; sold
     </Link>
   );
 }
+
+/** Phones: a slim bar pinned to the bottom, so booking is always one tap away. */
+export function MobileBookBar({ fromKobo }: { fromKobo: number | null }) {
+  const { range } = useStay();
+  const nights = range.checkIn && range.checkOut ? diffDays(range.checkIn, range.checkOut) : null;
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-[6px] lg:hidden">
+      <div className="mx-auto flex max-w-xl items-center justify-between gap-4">
+        <p className="text-sm leading-tight text-ink-muted">
+          <span className="kicker block !text-[10px]">From</span>
+          <span className="num text-lg font-medium text-ink">{formatNaira(fromKobo)}</span> / night
+        </p>
+        <a href="#rooms" className="btn btn-primary !min-h-11">
+          {nights ? `Rooms for ${nights} ${nights === 1 ? "night" : "nights"}` : "Choose a room"}
+        </a>
+      </div>
+    </div>
+  );
+}

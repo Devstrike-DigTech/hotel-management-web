@@ -193,6 +193,12 @@ export function BookingFlow({
           {step === 2 ? <StepReview payment={payment} setPayment={setPayment} guest={guest} /> : null}
           {step === 3 ? <StepConfirm hotel={hotel} summaryText={summaryText} hotelHref={hotelHref} /> : null}
 
+          {step < 3 && lines ? (
+            <p className="mt-10 flex items-baseline justify-between border-t border-line pt-4 text-sm lg:hidden">
+              <span className="text-ink-muted">Total, with 7.5% VAT</span>
+              <span className="num text-lg font-medium">{formatNaira(lines.total)}</span>
+            </p>
+          ) : null}
           {step < 3 ? (
             <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
               {step > 0 ? (
@@ -317,7 +323,7 @@ function StepStay(props: {
                 } ${out ? "cursor-not-allowed opacity-55" : ""}`}
               >
                 <input type="radio" name="room" value={r.id} checked={on} disabled={out} onChange={() => setRoomId(r.id)} className="peer sr-only" />
-                <Plate src={r.images[0]?.url} alt={r.images[0]?.alt ?? r.name} sizes="96px" className="aspect-[4/3] rounded-xs" />
+                <Plate src={r.images[0]?.url} alt={r.images[0]?.alt ?? r.name} sizes="96px" caption={false} className="aspect-[4/3] rounded-xs" />
                 <span className="min-w-0">
                   <span className="display-sm block text-lg">{r.name}</span>
                   <span className="num mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-ink-muted">
@@ -364,7 +370,7 @@ function StepStay(props: {
             {(
               [
                 ["overnight", "Overnight", Moon],
-                ["dayuse", "Day use, by the hour", Sun],
+                ["dayuse", "Day use", Sun],
               ] as const
             ).map(([k, label, Icon]) => (
               <label
@@ -733,7 +739,7 @@ function Summary({
   return (
     <div className="overflow-hidden rounded-md border border-line-strong bg-surface">
       <div className="flex gap-4 border-b border-line p-4">
-        <Plate src={hotel.coverImageUrl} alt={hotel.name} label=" " sizes="80px" className="size-20 shrink-0 rounded-xs" />
+        <Plate src={hotel.coverImageUrl} alt={hotel.name} caption={false} sizes="80px" className="size-20 shrink-0 rounded-xs" />
         <div className="min-w-0">
           <p className="kicker !text-[10px]">
             {hotel.area}, {hotel.city}

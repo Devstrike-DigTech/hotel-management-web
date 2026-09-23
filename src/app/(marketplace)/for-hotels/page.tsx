@@ -88,7 +88,9 @@ export default async function ForHotelsPage() {
             </p>
           </div>
           <div className="fade-up relative lg:col-span-5 [--d:300ms]">
-            <span aria-hidden className="adire-field absolute -inset-6 text-line-strong opacity-50 [mask-image:radial-gradient(closest-side,black,transparent)]" />
+            <span aria-hidden className="absolute -inset-8 [mask-image:radial-gradient(closest-side,black_40%,transparent)]">
+              <span className="adire-field absolute inset-0 text-line-strong opacity-70" />
+            </span>
             <OwnerDigest appName={APP_NAME} className="relative rotate-[1.5deg] motion-reduce:rotate-0" />
             <p className="relative mt-6 text-center font-display text-sm italic text-ink-muted">
               The nightly owner digest. Illustration, with example figures.
