@@ -23,7 +23,15 @@ export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Pr
     description,
     applicationName: hotel.name,
     alternates: { canonical: `${canonical}/` },
-    openGraph: { siteName: hotel.name, title: hotel.name, description: hotel.tagline, url: `${canonical}/`, type: "website", locale: "en_NG" },
+    openGraph: {
+      siteName: hotel.name,
+      title: hotel.name,
+      description: hotel.tagline,
+      url: `${canonical}/`,
+      type: "website",
+      locale: "en_NG",
+      images: [{ url: `${canonical}/og.png`, width: 1200, height: 630, alt: `${hotel.name}, ${hotel.area}` }],
+    },
   };
 }
 

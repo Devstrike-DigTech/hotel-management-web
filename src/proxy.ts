@@ -173,10 +173,7 @@ export async function proxy(req: NextRequest) {
     const { groupSlug } = site;
     // The group's own files, including its card at the path Next's metadata gives it.
     const own = pathname.startsWith(`/g/${groupSlug}/`) ? pathname.slice(`/g/${groupSlug}`.length) : pathname;
-    if (own === "/" || own === "/robots.txt" || own === "/sitemap.xml" || own.startsWith("/opengraph-image")) return rewriteToGroup(req, groupSlug, "", own);
-    // A hotel's own card, linked from its metadata by its fallback path.
-    const card = /^\/h\/([a-z0-9-]+)(\/opengraph-image.*)$/.exec(pathname);
-    if (card && site.properties.includes(card[1])) return rewriteToSite(req, card[1], `/${card[1]}`, card[2], "");
+    if (own === "/" || own === "/robots.txt" || own === "/sitemap.xml" || own === "/og.png") return rewriteToGroup(req, groupSlug, "", own);
     // "/{property slug}/..." is that hotel's microsite, under the group's host.
     const [first, rest] = firstSegment(pathname);
     if (site.properties.includes(first)) return rewriteToSite(req, first, `/${first}`, rest, "");
@@ -186,8 +183,8 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // Everything, including /robots.txt and /sitemap.xml, is served by the hotel's own routes. Its own
-  // fallback path (/h/{slug}/..., which metadata uses for the card) means the same thing here.
+  // Everything, including /robots.txt, /sitemap.xml and /og.png, is served by the hotel's own routes.
+  // Its own fallback path (/h/{slug}/...) means the same thing here.
   const rest = pathname === `/h/${site.slug}` ? "/" : pathname.startsWith(`/h/${site.slug}/`) ? pathname.slice(`/h/${site.slug}`.length) : pathname;
   return rewriteToSite(req, site.slug, "", rest);
 }

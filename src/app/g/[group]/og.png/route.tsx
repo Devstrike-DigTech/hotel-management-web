@@ -3,15 +3,13 @@ import { api } from "@/lib/api";
 import { APP_NAME } from "@/lib/env";
 import { OG, OgAdire, OgFob, ogFonts } from "@/lib/og";
 
-export const alt = "The hotel group's booking site";
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+const size = { width: 1200, height: 630 };
 
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 /** A group's social card: the group's name, then its hotels as a numbered register. */
-export default async function Image({ params }: { params: Promise<{ group: string }> }) {
-  const { group: slug } = await params;
+export async function GET(_req: Request, ctx: RouteContext<"/g/[group]/og.png">) {
+  const { group: slug } = await ctx.params;
   const [group, fonts] = await Promise.all([api.group(slug).catch(() => null), ogFonts()]);
   const accent = group?.branding.accentColor ?? OG.laterite;
   return new ImageResponse(
