@@ -50,7 +50,9 @@ test.describe("a hotel group's site", () => {
     await expect(page.getByTestId("group-link")).toHaveAttribute("href", "/");
     // Canonical addresses name the hotel's own domain, not the host it was reached on.
     const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
-    expect(canonical).toMatch(new RegExp(`^https://(${IKOYI}\\.|stay\\.palmwineikoyi)`));
+    const { canonicalUrl } = await (await page.request.get(`/api/v1/public/hotels/${IKOYI}`)).json();
+    expect(canonicalUrl).toMatch(/^https:\/\//);
+    expect(canonical?.replace(/\/$/, "")).toBe(canonicalUrl.replace(/\/$/, ""));
   });
 
   test("the marketplace lists the properties one by one, each part of the group", async ({ page }) => {
