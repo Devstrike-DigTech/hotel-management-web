@@ -83,3 +83,35 @@ test("the proxy secret never reaches the browser", async ({ page, request }) => 
   expect(scripts.length).toBeGreaterThan(0);
   for (const src of scripts) expect((await (await request.get(src)).text()).includes(secret!), src).toBe(false);
 });
+
+/*
+ * Against the live stack. POST /public/bookings is limited to 10 a minute per client address
+ * and the limit is counted before the body is validated, so an empty body costs nothing.
+ */
+test.describe("live rate limits", () => {
+  const fresh = () => `10.${1 + Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`;
+
+  test("through the gateway each visitor has their own bucket", async ({ request }) => {
+    const a = fresh();
+    const b = fresh();
+    const post = (ip: string) => request.post("/api/v1/public/bookings", { headers: { "x-forwarded-for": ip }, data: {} });
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) limited = (await post(a)).status() === 429;
+    test.skip(!limited, "Public rate limits are switched off on this backend");
+    expect((await post(b)).status()).not.toBe(429);
+  });
+
+  test("a spoofed X-Client-IP without the proxy secret is ignored by the backend", async ({ request }) => {
+    const api = (process.env.E2E_API_URL || process.env.API_URL || "http://localhost:4000").replace(/\/$/, "");
+    const me = fresh();
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) {
+      const res = await request.post(`${api}/api/v1/public/bookings`, {
+        headers: { "x-forwarded-for": me, "x-client-ip": fresh(), "x-proxy-auth": "not-the-secret-at-all" },
+        data: {},
+      });
+      limited = res.status() === 429;
+    }
+    expect(limited, "rotating X-Client-IP must not escape the limit").toBe(true);
+  });
+});

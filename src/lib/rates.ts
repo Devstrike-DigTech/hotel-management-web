@@ -257,12 +257,11 @@ export interface RawLivePlan {
 function adjustmentLabel(p: RawPlan): string | null {
   if (p.adjustmentLabel !== undefined) return p.adjustmentLabel;
   if (p.label) {
-    const only = /^\s*-\s*(\d+(?:\.\d+)?)\s*%\s*$/.exec(p.label);
-    if (only) return `${only[1]}% off`;
-    // "7+ nights -15%": say it the guest's way; anything else ("Breakfast included") is shown as a badge already.
-    const cond = /^(.*?)\s*-\s*(\d+(?:\.\d+)?)\s*%\s*$/.exec(p.label);
-    if (cond && cond[1]) return `${cond[2]}% off, ${cond[1].trim()}`;
-    return null;
+    // "-10%", "-10%, Non-refundable", "-15%, 7+ nights": the discount is the selling point; the rest
+    // (non-refundable, breakfast, minimum nights) has its own badge.
+    const pct = /-\s*(\d+(?:\.\d+)?)\s*%/.exec(p.label);
+    const amt = /-\s*\u20a6\s*([\d,]+)/.exec(p.label);
+    return pct ? `${pct[1]}% off` : amt ? `\u20a6${amt[1]} off` : null;
   }
   const a = p.adjustment;
   if (!a) return null;
@@ -338,6 +337,7 @@ export function plansFor(
       base.push(offer);
     }
   }
-  const rank = (p: PlanOffer) => (p.kind === "BAR" ? 0 : 1);
+  // Flexible first, then what can be booked (cheapest first), then what cannot for these dates.
+  const rank = (p: PlanOffer) => (p.kind === "BAR" ? 0 : p.quote && !p.bookable ? 2 : 1);
   return base.sort((a, b) => rank(a) - rank(b) || (a.quote?.totalKobo ?? a.fromKobo ?? 0) - (b.quote?.totalKobo ?? b.fromKobo ?? 0));
 }

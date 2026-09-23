@@ -10,6 +10,7 @@ test.use({ extraHTTPHeaders: { "x-forwarded-for": randomIp() } });
 
 const SLUG = "palmwine-house";
 const naira = (s: string) => Math.round(Number(s.replace(/[^\d.-]/g, "")) * 100); // "₦12,500" -> kobo
+const shown = (kobo: number) => `₦${Math.round(kobo / 100).toLocaleString("en-US")}`; // kobo -> "₦12,500"
 
 /** A weekday stay: no weekend or December nights, so every night is at the room's base price. */
 function weekdayStay(nights: number) {
@@ -69,11 +70,11 @@ test("book with a promo code: the saving is shown and is what is charged", async
   expect(await heldAmount(page)).toBe(total);
   await page.getByTestId("pay-now").click();
   await expect(page).toHaveURL(/\/pay\/mock\?reference=/);
-  expect(naira(await page.getByTestId("mock-amount").innerText())).toBe(total);
+  await expect(page.getByTestId("mock-amount")).toHaveText(shown(total));
   await page.getByTestId("mock-pay").click();
   await expect(page.getByTestId("confirmation-card")).toBeVisible({ timeout: 30_000 });
-  expect(naira(await page.getByTestId("paid-amount").innerText())).toBe(total);
-  await expect(page.getByTestId("card-discount")).toHaveText(`-₦${Math.round(saving / 100).toLocaleString("en-US")}`);
+  await expect(page.getByTestId("paid-amount")).toHaveText(shown(total));
+  await expect(page.getByTestId("card-discount")).toHaveText(`-${shown(saving)}`);
 });
 
 test("book the non-refundable rate on the hotel's own site: the policy is stated and pay-at-hotel is off", async ({ page }) => {

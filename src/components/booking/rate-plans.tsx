@@ -26,6 +26,9 @@ export function PlanBadges({ plan, className = "" }: { plan: PlanOffer; classNam
           <ShieldCheck size={12} weight="fill" aria-hidden /> Free cancellation
         </span>
       )}
+      {plan.minNights && plan.minNights > 1 ? (
+        <span className="inline-flex items-center rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-muted">{plan.minNights}+ nights</span>
+      ) : null}
       {plan.adjustmentLabel ? <span className="num text-[11px] font-medium text-laterite">{plan.adjustmentLabel}</span> : null}
     </span>
   );

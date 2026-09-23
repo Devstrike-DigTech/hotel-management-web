@@ -378,7 +378,7 @@ export function BookingFlow({
             dayUse={dayUse}
             adults={adults}
             kids={children}
-            estimate={step < 2 ? (plan?.quote ?? live?.quote ?? null) : null}
+            estimate={plan?.quote ?? live?.quote ?? null}
             planName={plans.length > 1 && plan ? planTitle(plan) : null}
             quote={step === 2 ? quote : null}
             loading={availability.status === "loading"}
