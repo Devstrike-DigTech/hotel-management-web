@@ -7,7 +7,7 @@ const CITIES = ["Lagos", "Abuja", "Port Harcourt", "Calabar", "Ibadan", "Enugu"]
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="mt-24 border-t border-line bg-surface">
+    <footer className="mt-24 border-t border-line bg-surface print:hidden">
       <div className="container-page">
         <span aria-hidden className="adire-rule -mt-[10px] text-line-strong" />
         <div className="grid gap-12 py-14 md:grid-cols-12">
