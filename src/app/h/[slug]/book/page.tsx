@@ -23,7 +23,7 @@ export default async function MicrositeBook({ params, searchParams }: PageProps<
       hotelHref={base || "/"}
       channel="BOOKING_SITE"
       confirmPath={`${base}/booking/confirmation`}
-      initial={{ room: one(sp.room) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
+      initial={{ room: one(sp.room) || null, plan: one(sp.plan) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
     />
   );
 }

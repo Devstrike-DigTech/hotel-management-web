@@ -33,7 +33,10 @@ import { Field, FieldError, Notice } from "../ui/field";
 import { Plate } from "../ui/plate";
 import { BookingReview, type Held } from "./booking-review";
 import { BookingSummary } from "./booking-summary";
+import { PlanChoice } from "./rate-plans";
 import { useAvailability, type AvailabilityQuery } from "./use-availability";
+import { usePriceCalendar } from "./use-price-calendar";
+import { plansFor, planTitle, type PlanOffer } from "@/lib/rates";
 
 export interface BookingHotel {
   slug: string;
@@ -80,7 +83,7 @@ const WORDS = ["one", "two", "three"];
 interface Draft {
   v: 2;
   guest: GuestForm;
-  held: (Held & { roomId: string; kind: StayKind; range: Range; dayUse: DayUse; adults: number; children: number }) | null;
+  held: (Held & { roomId: string; planId?: string; kind: StayKind; range: Range; dayUse: DayUse; adults: number; children: number }) | null;
 }
 
 export function BookingFlow({
@@ -92,19 +95,20 @@ export function BookingFlow({
   hotel: BookingHotel;
   site: BookingSite;
   today: ISODate;
-  initial: { room: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
+  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
 }) {
   const rooms = useMemo(() => [...hotel.roomTypes].sort((a, b) => a.basePriceKobo - b.basePriceKobo), [hotel.roomTypes]);
   const draftKey = `booking:${hotel.slug}:${site.channel}`;
   const [step, setStep] = useState(0);
   const [roomId, setRoomId] = useState<string | undefined>(rooms.some((r) => r.id === initial.room) ? initial.room! : undefined);
   const [kind, setKind] = useState<StayKind>("overnight");
+  const [planPick, setPlanPick] = useState<string | undefined>(initial.plan ?? undefined);
   const [range, setRange] = useState<Range>({ checkIn: initial.checkIn, checkOut: initial.checkOut });
   const [dayUse, setDayUse] = useState<DayUse>({ date: today, from: "12:00", hours: 3 });
   const [adults, setAdults] = useState(Math.max(1, Math.min(initial.guests, 10)));
   const [children, setChildren] = useState(0);
   const [guest, setGuest] = useState<GuestForm>({ fullName: "", phone: "", email: "", arrival: "", requests: "" });
-  const [errors, setErrors] = useState<Partial<Record<keyof GuestForm | "dates" | "room", string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof GuestForm | "dates" | "room" | "plan", string>>>({});
   const [held, setHeld] = useState<Held | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [account, setAccount] = useState<GuestAccount | null>(null);
@@ -124,13 +128,18 @@ export function BookingFlow({
 
   const query: AvailabilityQuery | null =
     effectiveKind === "dayuse"
-      ? { stayType: "DAY_USE", date: dayUse.date, startTime: dayUse.from, hours: dayUse.hours, adults, children }
+      ? { stayType: "DAY_USE", date: dayUse.date, startTime: dayUse.from, hours: dayUse.hours, adults, children, channel: site.channel }
       : range.checkIn && range.checkOut
-        ? { stayType: "NIGHTLY", checkIn: range.checkIn, checkOut: range.checkOut, adults, children }
+        ? { stayType: "NIGHTLY", checkIn: range.checkIn, checkOut: range.checkOut, adults, children, channel: site.channel }
         : null;
   const availability = useAvailability(hotel.slug, query);
   const liveFor = (id: string): RoomTypeAvailability | null => availability.data?.roomTypes.find((r) => r.roomType.id === id) ?? null;
   const live = roomId ? liveFor(roomId) : null;
+  const plansOf = (r: RoomTypePublic) => (effectiveKind === "overnight" ? plansFor(r, liveFor(r.id)) : []);
+  const plans: PlanOffer[] = room ? plansOf(room) : [];
+  // The guest's pick when it is on offer for this room, else the first rate that can be booked.
+  const plan = plans.find((p) => p.id === planPick && (p.bookable || !p.quote)) ?? plans.find((p) => p.bookable) ?? plans[0];
+  const calendar = usePriceCalendar(hotel.slug, adults, children, effectiveKind === "overnight");
 
   /* Restore: guest details always; a room hold only while it is still running (back from Paystack). */
   useEffect(() => {
@@ -140,6 +149,7 @@ export function BookingFlow({
       setGuest((g) => ({ ...g, ...d.guest }));
       if (d.held && new Date(d.held.holdExpiresAt).getTime() > Date.now()) {
         setRoomId(d.held.roomId);
+        if (d.held.planId) setPlanPick(d.held.planId);
         setKind(d.held.kind);
         setRange(d.held.range);
         setDayUse(d.held.dayUse);
@@ -156,9 +166,9 @@ export function BookingFlow({
     draft.set(draftKey, {
       v: 2,
       guest,
-      held: held && roomId ? { ...held, roomId, kind: effectiveKind, range, dayUse, adults, children } : null,
+      held: held && roomId ? { ...held, roomId, planId: plan?.id, kind: effectiveKind, range, dayUse, adults, children } : null,
     } satisfies Draft);
-  }, [draftKey, guest, held, roomId, effectiveKind, range, dayUse, adults, children]);
+  }, [draftKey, guest, held, roomId, plan?.id, effectiveKind, range, dayUse, adults, children]);
 
   /* A signed-in guest: fetch the account and fill in what we know. */
   useEffect(() => {
@@ -196,6 +206,10 @@ export function BookingFlow({
             ? `The ${room.name} sleeps ${room.capacity}. Choose a larger room or fewer guests.`
             : "That room type is full for these dates. Choose another, or change the dates.";
       if (effectiveKind === "overnight" && !nights) e.dates = "Choose your check-in and check-out days.";
+      else if (plan && !e.room) {
+        if (plan.quote && !plan.bookable) e.plan = plan.reason ?? `The ${planTitle(plan)} rate is not available for these dates. Choose another rate.`;
+        else if (plan.minNights && nights < plan.minNights) e.plan = `The ${planTitle(plan)} rate needs at least ${plan.minNights} nights; your stay is ${nights}.`;
+      }
     }
     if (step === 1) {
       if (guest.fullName.trim().split(/\s+/).length < 2) e.fullName = "Enter your first and last name, as on your ID.";
@@ -220,6 +234,7 @@ export function BookingFlow({
     ? {
         hotelSlug: hotel.slug,
         roomTypeId: room.id,
+        ...(plan && effectiveKind === "overnight" ? { ratePlanId: plan.id } : {}),
         channel: site.channel,
         ...(effectiveKind === "dayuse"
           ? { stayType: "DAY_USE" as const, date: dayUse.date, startTime: dayUse.from, hours: dayUse.hours }
@@ -284,6 +299,11 @@ export function BookingFlow({
               liveFor={liveFor}
               availability={availability}
               nights={nights}
+              plansOf={plansOf}
+              plans={plans}
+              plan={plan}
+              setPlan={setPlanPick}
+              calendar={calendar}
             />
           ) : null}
           {step === 1 ? (
@@ -314,6 +334,7 @@ export function BookingFlow({
               site={site}
               request={quoteRequest}
               guest={guest}
+              plan={plans.length > 1 ? plan : undefined}
               held={held}
               setHeld={setHeld}
               onQuote={setQuote}
@@ -357,7 +378,8 @@ export function BookingFlow({
             dayUse={dayUse}
             adults={adults}
             kids={children}
-            estimate={step < 2 ? (live?.quote ?? null) : null}
+            estimate={step < 2 ? (plan?.quote ?? live?.quote ?? null) : null}
+            planName={plans.length > 1 && plan ? planTitle(plan) : null}
             quote={step === 2 ? quote : null}
             loading={availability.status === "loading"}
           />
@@ -429,8 +451,13 @@ function StepStay(props: {
   liveFor: (id: string) => RoomTypeAvailability | null;
   availability: ReturnType<typeof useAvailability>;
   nights: number;
+  plansOf: (r: RoomTypePublic) => PlanOffer[];
+  plans: PlanOffer[];
+  plan: PlanOffer | undefined;
+  setPlan: (id: string) => void;
+  calendar: ReturnType<typeof usePriceCalendar>;
 }) {
-  const { rooms, roomId, setRoomId, kind, setKind, canDayUse, range, setRange, dayUse, setDayUse, today, errors, wide, liveFor, availability, nights } = props;
+  const { rooms, roomId, setRoomId, kind, setKind, canDayUse, range, setRange, dayUse, setDayUse, today, errors, wide, liveFor, availability, nights, plans, plan, calendar } = props;
   const room = rooms.find((r) => r.id === roomId);
   const dated = kind === "dayuse" || !!nights;
   const party = props.adults + props.kids;
@@ -470,7 +497,15 @@ function StepStay(props: {
             <CalendarBlank size={15} aria-hidden /> Dates
           </legend>
           <div className="rounded-sm border border-line-strong bg-surface p-4 sm:p-6">
-            <RangeCalendar value={range} onChange={setRange} today={today} months={wide ? 2 : 1} max={addDays(today, 365)} />
+            <RangeCalendar
+              value={range}
+              onChange={setRange}
+              today={today}
+              months={wide ? 2 : 1}
+              max={addDays(today, 365)}
+              prices={calendar.prices}
+              onVisibleChange={calendar.onVisibleChange}
+            />
           </div>
           <p className="mt-3 text-sm text-ink-muted" aria-live="polite">
             {range.checkIn && range.checkOut ? (
@@ -531,6 +566,10 @@ function StepStay(props: {
             const lr = dated ? liveFor(r.id) : null;
             const out = !!lr && !lr.bookable;
             const tooSmall = party > r.capacity;
+            const rPlans = props.plansOf(r);
+            const quoted = rPlans.filter((p) => p.bookable && p.quote).map((p) => p.quote!.totalKobo);
+            const cheapest = quoted.length ? Math.min(...quoted) : (lr?.quote?.totalKobo ?? null);
+            const several = rPlans.length > 1;
             return (
               <label
                 key={r.id}
@@ -575,12 +614,16 @@ function StepStay(props: {
                 <span className="text-right">
                   {lr?.quote && lr.bookable ? (
                     <>
-                      <span className="num block font-medium">{formatNaira(lr.quote.totalKobo)}</span>
+                      {several ? <span className="block text-[11px] text-ink-muted">from</span> : null}
+                      <span className="num block font-medium">{formatNaira(cheapest)}</span>
                       <span className="text-xs text-ink-muted">{kind === "dayuse" ? `${lr.quote.units} hours` : `${lr.quote.units} ${lr.quote.units === 1 ? "night" : "nights"}`}, all in</span>
                     </>
                   ) : (
                     <>
-                      <span className="num block font-medium">{formatNaira(kind === "dayuse" && r.hourlyPriceKobo ? r.hourlyPriceKobo : r.basePriceKobo)}</span>
+                      {kind === "overnight" && (several || r.fromKobo) ? <span className="block text-[11px] text-ink-muted">from</span> : null}
+                      <span className="num block font-medium">
+                        {formatNaira(kind === "dayuse" && r.hourlyPriceKobo ? r.hourlyPriceKobo : fromNightly(r, rPlans))}
+                      </span>
                       <span className="text-xs text-ink-muted">{kind === "dayuse" ? "an hour" : "a night"}</span>
                     </>
                   )}
@@ -604,6 +647,26 @@ function StepStay(props: {
           </p>
         ) : null}
       </fieldset>
+
+      {room && plans.length > 1 ? (
+        <fieldset>
+          <legend className="kicker mb-4">Rate for the {room.name}</legend>
+          <PlanChoice
+            plans={plans}
+            value={plan?.id}
+            onChange={props.setPlan}
+            nights={nights}
+            fallbackPolicy={props.hotel.booking?.cancellationPolicy ?? availability.data?.cancellationPolicy ?? null}
+            freeUntil={availability.data?.freeCancellationUntil ?? null}
+            loading={availability.status === "loading"}
+          />
+          <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-ink-muted">
+            The difference is what happens if your plans change. The flexible rate can be cancelled free until the date shown; the non-refundable rate costs less
+            because it cannot.
+          </p>
+          {errors.plan ? <FieldError>{errors.plan}</FieldError> : null}
+        </fieldset>
+      ) : null}
     </div>
   );
 }
@@ -775,3 +838,9 @@ export function composeRequests(g: GuestForm) {
 }
 
 export type { Quote };
+
+/** The nightly "from" price without dates: the cheapest rate the hotel publishes for the room. */
+function fromNightly(r: RoomTypePublic, plans: PlanOffer[]) {
+  const candidates = [r.fromKobo, ...plans.map((p) => p.fromKobo)].filter((n): n is number => typeof n === "number" && n > 0);
+  return candidates.length ? Math.min(...candidates) : r.basePriceKobo;
+}

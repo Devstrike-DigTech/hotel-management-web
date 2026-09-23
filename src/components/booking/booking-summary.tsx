@@ -21,6 +21,7 @@ export function BookingSummary({
   estimate,
   quote,
   loading,
+  planName,
 }: {
   hotel: BookingHotel;
   room?: RoomTypePublic;
@@ -33,6 +34,7 @@ export function BookingSummary({
   estimate: PriceBreakdown | null;
   quote: Quote | null;
   loading: boolean;
+  planName?: string | null;
 }) {
   const price = quote?.breakdown ?? estimate;
   return (
@@ -59,6 +61,7 @@ export function BookingSummary({
           {kids ? `, ${plural(kids, "child", "children")}` : ""}
         </Row>
         {kind === "overnight" && nights ? <Row k="Nights">{nights}</Row> : null}
+        {planName ? <Row k="Rate">{planName}</Row> : null}
       </dl>
       <div className="border-t border-ink bg-paper p-4" aria-live="polite">
         {price ? (
@@ -69,6 +72,12 @@ export function BookingSummary({
               </dt>
               <dd>{formatNaira(price.lines.reduce((n, l) => n + l.amountKobo, 0))}</dd>
             </div>
+            {price.discountKobo > 0 ? (
+              <div className="flex justify-between gap-4 text-palm" data-testid="summary-discount">
+                <dt className="font-sans [font-variant-numeric:normal]">{quote?.promo ? `Promo ${quote.promo.code}` : "Discount"}</dt>
+                <dd>&minus;{formatNaira(price.discountKobo)}</dd>
+              </div>
+            ) : null}
             {price.taxes.filter((t) => !t.inclusive).map((t) => (
               <div key={t.code} className="flex justify-between gap-4">
                 <dt className="font-sans text-ink-muted [font-variant-numeric:normal]">{t.label}</dt>

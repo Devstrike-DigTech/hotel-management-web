@@ -43,7 +43,7 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
   const from = hotel.startingRateKobo ?? minRoom;
 
   return (
-    <StayProvider initial={initial} today={today} bookBase={bookBase} slug={hotel.slug}>
+    <StayProvider initial={initial} today={today} bookBase={bookBase} slug={hotel.slug} cancellationPolicy={policy} channel={variant === "microsite" ? "BOOKING_SITE" : "MARKETPLACE"}>
       <div className="container-page pb-16 pt-8 lg:pb-0 lg:pt-10">
         {variant === "marketplace" ? (
           <nav aria-label="Breadcrumb" className="kicker flex flex-wrap items-center gap-2">

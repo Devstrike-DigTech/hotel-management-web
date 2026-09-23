@@ -2,17 +2,35 @@
 
 import { useEffect, useState } from "react";
 import type { HotelAvailability } from "@/lib/booking-types";
-import { call, humanError } from "@/lib/client-api";
+import { call, ClientApiError, humanError } from "@/lib/client-api";
 
 export type AvailabilityQuery =
-  | { stayType: "NIGHTLY"; checkIn: string; checkOut: string; adults: number; children: number }
-  | { stayType: "DAY_USE"; date: string; startTime: string; hours: number; adults: number; children: number };
+  | { stayType: "NIGHTLY"; checkIn: string; checkOut: string; adults: number; children: number; channel?: string }
+  | { stayType: "DAY_USE"; date: string; startTime: string; hours: number; adults: number; children: number; channel?: string };
 
 export type Availability =
   | { status: "idle"; data: null }
   | { status: "loading"; data: HotelAvailability | null }
   | { status: "ready"; data: HotelAvailability }
   | { status: "error"; data: HotelAvailability | null; message: string };
+
+/** Set once an API older than M4 refuses the `channel` parameter; later calls leave it out. */
+let channelUnsupported = false;
+
+/** GET /public/hotels/:slug/availability, sending the booking channel when the API takes it. */
+export async function fetchAvailability(slug: string, query: Record<string, string | number | undefined | null>, signal?: AbortSignal) {
+  const path = `public/hotels/${encodeURIComponent(slug)}/availability`;
+  const q = channelUnsupported ? { ...query, channel: undefined } : query;
+  try {
+    return await call<HotelAvailability>(path, { query: q, signal });
+  } catch (e) {
+    if (q.channel && e instanceof ClientApiError && e.code === "VALIDATION_ERROR" && e.fields.channel) {
+      channelUnsupported = true;
+      return call<HotelAvailability>(path, { query: { ...query, channel: undefined }, signal });
+    }
+    throw e;
+  }
+}
 
 /** Live availability for a hotel, refetched (debounced) whenever the stay changes; keeps the last answer while loading. */
 export function useAvailability(slug: string, q: AvailabilityQuery | null) {
@@ -30,10 +48,7 @@ export function useAvailability(slug: string, q: AvailabilityQuery | null) {
     const t = setTimeout(async () => {
       setState((s) => ({ status: "loading", data: s.data }));
       try {
-        const data = await call<HotelAvailability>(`public/hotels/${encodeURIComponent(slug)}/availability`, {
-          query: query as unknown as Record<string, string | number>,
-          signal: ctl.signal,
-        });
+        const data = await fetchAvailability(slug, query as unknown as Record<string, string | number>, ctl.signal);
         setState({ status: "ready", data });
       } catch (e) {
         if (ctl.signal.aborted) return;

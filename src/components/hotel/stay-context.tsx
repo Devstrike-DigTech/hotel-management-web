@@ -4,10 +4,15 @@ import { ArrowRight, Clock, ShieldCheck } from "@phosphor-icons/react";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { HotelAvailability, RoomTypeAvailability } from "@/lib/booking-types";
-import { call, humanError } from "@/lib/client-api";
+import { humanError } from "@/lib/client-api";
+import { fetchAvailability } from "../booking/use-availability";
 import { diffDays, type ISODate } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
 import { formatLagosShort } from "@/lib/time";
+import type { RoomTypePublic } from "@/lib/types";
+import { plansFor, type PlanOffer } from "@/lib/rates";
+import { PlanLedger } from "../booking/rate-plans";
+import { usePriceCalendar } from "../booking/use-price-calendar";
 import { DateRangeField } from "../search/date-range-field";
 import { GuestsStepper } from "../search/guests-stepper";
 import type { Range } from "../search/range-calendar";
@@ -28,7 +33,9 @@ interface StayState {
   guests: number;
   setGuests: (n: number) => void;
   today: ISODate;
-  bookHref: (roomId?: string) => string;
+  bookHref: (roomId?: string, planId?: string) => string;
+  calendar: ReturnType<typeof usePriceCalendar>;
+  cancellationPolicy: HotelAvailability["cancellationPolicy"] | null;
 }
 
 const Ctx = createContext<StayState | null>(null);
@@ -39,12 +46,17 @@ export function StayProvider({
   today,
   bookBase,
   slug,
+  cancellationPolicy = null,
+  channel,
 }: {
   children: React.ReactNode;
   initial: { checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
   today: ISODate;
   bookBase: string;
   slug: string;
+  cancellationPolicy?: HotelAvailability["cancellationPolicy"] | null;
+  /** The channel this page books with, so plans and prices match what the booking will charge. */
+  channel?: "MARKETPLACE" | "BOOKING_SITE";
 }) {
   const [range, setRange] = useState<Range>({ checkIn: initial.checkIn, checkOut: initial.checkOut });
   const [guests, setGuests] = useState(initial.guests);
@@ -62,10 +74,7 @@ export function StayProvider({
     const t = setTimeout(async () => {
       setAvailability((a) => ({ status: "loading", key, previous: a.status === "ready" ? a.data : a.status === "loading" ? a.previous : null }));
       try {
-        const data = await call<HotelAvailability>(`public/hotels/${encodeURIComponent(slug)}/availability`, {
-          query: { checkIn: range.checkIn, checkOut: range.checkOut, adults: guests },
-          signal: ctl.signal,
-        });
+        const data = await fetchAvailability(slug, { checkIn: range.checkIn, checkOut: range.checkOut, adults: guests, channel }, ctl.signal);
         setAvailability({ status: "ready", key, data });
       } catch (e) {
         if (ctl.signal.aborted) return;
@@ -76,14 +85,16 @@ export function StayProvider({
       clearTimeout(t);
       ctl.abort();
     };
-  }, [key, slug, range.checkIn, range.checkOut, guests]);
+  }, [key, slug, range.checkIn, range.checkOut, guests, channel]);
 
   const data = availability.status === "ready" ? availability.data : availability.status === "loading" ? availability.previous : null;
   const roomFor = (id: string) => data?.roomTypes.find((r) => r.roomType.id === id) ?? null;
   const retryAvailability = () => setAttempt((n) => n + 1);
-  const bookHref = (roomId?: string) => {
+  const calendar = usePriceCalendar(slug, guests);
+  const bookHref = (roomId?: string, planId?: string) => {
     const p = new URLSearchParams();
     if (roomId) p.set("room", roomId);
+    if (planId) p.set("plan", planId);
     if (range.checkIn && range.checkOut) {
       p.set("checkIn", range.checkIn);
       p.set("checkOut", range.checkOut);
@@ -92,7 +103,7 @@ export function StayProvider({
     return `${bookBase}?${p.toString()}`;
   };
   return (
-    <Ctx.Provider value={{ availability, roomFor, retryAvailability, range, setRange, guests, setGuests, today, bookHref }}>
+    <Ctx.Provider value={{ availability, roomFor, retryAvailability, range, setRange, guests, setGuests, today, bookHref, calendar, cancellationPolicy }}>
       {children}
     </Ctx.Provider>
   );
@@ -114,11 +125,11 @@ export function StayCard({
   phone: string | null;
   cancellationSummary?: string | null;
 }) {
-  const { range, setRange, guests, setGuests, today, availability, retryAvailability } = useStay();
+  const { range, setRange, guests, setGuests, today, availability, retryAvailability, calendar } = useStay();
   const nights = range.checkIn && range.checkOut ? diffDays(range.checkIn, range.checkOut) : null;
   const data = availability.status === "ready" ? availability.data : null;
   const bookable = data?.roomTypes.filter((r) => r.bookable && r.quote) ?? [];
-  const cheapest = bookable.reduce<number | null>((m, r) => (m === null || r.quote!.totalKobo < m ? r.quote!.totalKobo : m), null);
+  const cheapest = cheapestTotal(data);
 
   return (
     <div className="rounded-md border border-line-strong bg-surface p-5 sm:p-6" data-testid="stay-card">
@@ -166,7 +177,7 @@ export function StayCard({
         )}
       </div>
       <div className="mt-5 space-y-3">
-        <DateRangeField value={range} onChange={setRange} today={today} variant="stack" align="right" />
+        <DateRangeField value={range} onChange={setRange} today={today} variant="stack" align="right" prices={calendar.prices} onVisibleChange={calendar.onVisibleChange} />
         <div className="rounded-sm border border-line-strong bg-surface px-4 py-3">
           <GuestsStepper value={guests} onChange={setGuests} layout="row" />
         </div>
@@ -195,19 +206,15 @@ export function StayCard({
 }
 
 /** The price and action column of a room row: the nightly rate without dates, the stay's total with them. */
-export function RoomOffer({
-  roomId,
-  name,
-  basePriceKobo,
-  hourlyPriceKobo,
-}: {
-  roomId: string;
-  name: string;
-  basePriceKobo: number;
-  hourlyPriceKobo: number | null;
-}) {
+export function RoomOffer({ room }: { room: RoomTypePublic }) {
+  const { id: roomId, name, basePriceKobo, hourlyPriceKobo } = room;
   const { availability, roomFor, range, bookHref } = useStay();
   const live = roomFor(roomId);
+  const plans = plansFor(room, live);
+  const several = plans.length > 1;
+  const quoted = plans.filter((p) => p.bookable && p.quote).map((p) => p.quote!);
+  const best = quoted.length ? quoted.reduce((a, b) => (b.totalKobo < a.totalKobo ? b : a)) : (live?.quote ?? null);
+  const fromNight = nightlyFrom(room, plans);
   const dated = !!(range.checkIn && range.checkOut);
   const loading = dated && (availability.status === "loading" || availability.status === "idle");
   const nights = dated ? diffDays(range.checkIn!, range.checkOut!) : 0;
@@ -219,12 +226,11 @@ export function RoomOffer({
         {dated && live?.quote && live.bookable ? (
           <>
             <p className="kicker">
+              {several ? "From, " : ""}
               {nights} {nights === 1 ? "night" : "nights"}, all in
             </p>
-            <p className={`num mt-1 text-2xl font-medium transition-opacity ${loading ? "opacity-40" : ""}`}>{formatNaira(live.quote.totalKobo)}</p>
-            <p className="mt-1 text-[12.5px] text-ink-muted">
-              <span className="num">{formatNaira(live.quote.rateKobo)}</span> a night + taxes
-            </p>
+            <p className={`num mt-1 text-2xl font-medium transition-opacity ${loading ? "opacity-40" : ""}`}>{formatNaira(best!.totalKobo)}</p>
+            <p className="mt-1 text-[12.5px] text-ink-muted">{nightlyLine(best!)}</p>
             <p className={`kicker mt-2.5 ${live.lowAvailability ? "!text-laterite" : "!text-palm"}`}>
               {live.lowAvailability ? `Only ${live.available} left` : "Free for your dates"}
             </p>
@@ -248,8 +254,8 @@ export function RoomOffer({
           </>
         ) : (
           <>
-            <p className="kicker">Per night</p>
-            <p className="num mt-1 text-2xl font-medium">{formatNaira(basePriceKobo)}</p>
+            <p className="kicker">{fromNight < basePriceKobo || several ? "From, per night" : "Per night"}</p>
+            <p className="num mt-1 text-2xl font-medium">{formatNaira(fromNight)}</p>
             {hourlyPriceKobo ? (
               <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] text-brass">
                 <Clock size={14} weight="bold" aria-hidden />
@@ -264,6 +270,10 @@ export function RoomOffer({
         <span className="btn btn-outline w-full cursor-not-allowed opacity-50 sm:w-auto" aria-disabled="true">
           Not available
         </span>
+      ) : several ? (
+        <a href={`#rates-${roomId}`} className="btn btn-ink group w-full sm:w-auto" aria-label={`See the rates for the ${name}`}>
+          {plans.length} rates <ArrowRight size={15} aria-hidden className="rotate-90 transition-transform group-hover:translate-y-0.5" />
+        </a>
       ) : (
         <Link href={bookHref(roomId)} className="btn btn-ink group w-full sm:w-auto" aria-label={`Select ${name}`}>
           Select <ArrowRight size={15} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
@@ -278,7 +288,7 @@ export function MobileBookBar({ fromKobo }: { fromKobo: number | null }) {
   const { range, availability } = useStay();
   const nights = range.checkIn && range.checkOut ? diffDays(range.checkIn, range.checkOut) : null;
   const data = nights && availability.status === "ready" ? availability.data : null;
-  const cheapest = data?.roomTypes.filter((r) => r.bookable && r.quote).reduce<number | null>((m, r) => (m === null || r.quote!.totalKobo < m ? r.quote!.totalKobo : m), null) ?? null;
+  const cheapest = cheapestTotal(data);
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-[6px] lg:hidden print:hidden">
       <div className="mx-auto flex max-w-xl items-center justify-between gap-4">
@@ -301,6 +311,54 @@ export function MobileBookBar({ fromKobo }: { fromKobo: number | null }) {
           {nights ? `Rooms for ${nights} ${nights === 1 ? "night" : "nights"}` : "Choose a room"}
         </a>
       </div>
+    </div>
+  );
+}
+
+/** Cheapest bookable stay across room types and their rate plans. */
+function cheapestTotal(data: HotelAvailability | null): number | null {
+  let min: number | null = null;
+  for (const r of data?.roomTypes ?? []) {
+    if (!r.bookable) continue;
+    const totals = [r.quote?.totalKobo, ...(r.ratePlans ?? []).filter((p) => p.bookable !== false && p.quote).map((p) => p.quote!.totalKobo)];
+    for (const t of totals) if (typeof t === "number" && (min === null || t < min)) min = t;
+  }
+  return min;
+}
+
+/** The lowest published nightly rate for a room, for "from" prices without dates. */
+function nightlyFrom(room: RoomTypePublic, plans: PlanOffer[]) {
+  const c = [room.fromKobo, ...plans.map((p) => p.fromKobo)].filter((n): n is number => typeof n === "number" && n > 0);
+  return c.length ? Math.min(...c) : room.basePriceKobo;
+}
+
+function nightlyLine(b: NonNullable<RoomTypeAvailability["quote"]>) {
+  const amounts = b.lines.map((l) => l.amountKobo);
+  const lo = amounts.length ? Math.min(...amounts) : b.rateKobo;
+  const hi = amounts.length ? Math.max(...amounts) : b.rateKobo;
+  return lo === hi ? `${formatNaira(lo)} a night + taxes` : `${formatNaira(lo)} to ${formatNaira(hi)} a night + taxes`;
+}
+
+/** The hotel page's rate ledger for one room type, when it sells more than one rate. */
+export function RoomPlans({ room }: { room: RoomTypePublic }) {
+  const { roomFor, range, bookHref, availability, cancellationPolicy } = useStay();
+  const live = roomFor(room.id);
+  const plans = plansFor(room, live);
+  if (plans.length < 2) return null;
+  const dated = !!(range.checkIn && range.checkOut);
+  const nights = dated ? diffDays(range.checkIn!, range.checkOut!) : 0;
+  const data = availability.status === "ready" ? availability.data : null;
+  return (
+    <div id={`rates-${room.id}`} className="scroll-mt-28">
+      <PlanLedger
+        roomName={room.name}
+        plans={dated ? plans : plans.map((p) => ({ ...p, quote: null, bookable: true, reason: null }))}
+        nights={nights}
+        fallbackPolicy={data?.cancellationPolicy ?? cancellationPolicy}
+        freeUntil={dated ? (data?.freeCancellationUntil ?? null) : null}
+        hrefFor={(planId) => bookHref(room.id, planId)}
+        loading={dated && availability.status === "loading"}
+      />
     </div>
   );
 }

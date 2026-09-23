@@ -2,7 +2,7 @@ import { Bed, Ruler, UsersThree } from "@phosphor-icons/react/ssr";
 import type { RoomTypePublic } from "@/lib/types";
 import { AmenityIcon } from "../ui/amenity";
 import { Plate } from "../ui/plate";
-import { RoomOffer } from "./stay-context";
+import { RoomOffer, RoomPlans } from "./stay-context";
 
 export function RoomList({ rooms }: { rooms: RoomTypePublic[] }) {
   if (!rooms.length)
@@ -59,8 +59,13 @@ function RoomRow({ room, n }: { room: RoomTypePublic; n: number }) {
         ) : null}
       </div>
       <div className="flex flex-col gap-4 border-t border-line pt-4 sm:col-span-2 sm:flex-row sm:items-end sm:justify-between lg:col-span-1 lg:w-52 lg:flex-col lg:items-end lg:justify-between lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
-        <RoomOffer roomId={room.id} name={room.name} basePriceKobo={room.basePriceKobo} hourlyPriceKobo={room.hourlyPriceKobo} />
+        <RoomOffer room={room} />
       </div>
+      {room.ratePlans && room.ratePlans.length > 1 ? (
+        <div className="sm:col-span-2 lg:col-span-3">
+          <RoomPlans room={room} />
+        </div>
+      ) : null}
     </li>
   );
 }

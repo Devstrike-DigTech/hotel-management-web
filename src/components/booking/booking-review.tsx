@@ -8,6 +8,7 @@ import {
   CreditCard,
   DeviceMobile,
   LockSimple,
+  Tag,
   PencilSimple,
   ShieldCheck,
   Storefront,
@@ -19,7 +20,10 @@ import { call, ClientApiError, getClockSkew, humanError, newKey } from "@/lib/cl
 import { APP_NAME, SITE_URL } from "@/lib/env";
 import { formatNaira, formatPhone, toE164Digits } from "@/lib/format";
 import { formatLagosClock, formatLagosDateTime, policyTail } from "@/lib/time";
+import { diffDays, formatShort, formatWeekday } from "@/lib/dates";
+import { isNonRefundable, isPromoError, nightlyVaries, planTitle, promoMessage, type PlanOffer } from "@/lib/rates";
 import { Notice } from "../ui/field";
+import { PromoField, type PromoProblem } from "./promo-field";
 import { StepTitle, composeRequests, type BookingHotel, type BookingSite, type GuestForm } from "./booking-flow";
 import { HoldCountdown, useRemaining } from "./hold-countdown";
 
@@ -49,6 +53,7 @@ export function BookingReview({
   site,
   request,
   guest,
+  plan,
   held,
   setHeld,
   onQuote,
@@ -59,6 +64,8 @@ export function BookingReview({
   site: BookingSite;
   request: QuoteRequest;
   guest: GuestForm;
+  /** The chosen rate plan when the room has more than one. */
+  plan?: PlanOffer;
   held: Held | null;
   setHeld: (h: Held | null) => void;
   onQuote: (q: Quote | null) => void;
@@ -77,13 +84,46 @@ export function BookingReview({
   const [expired, setExpired] = useState(false);
   const bookKey = useRef<string | null>(null);
   const requestKey = JSON.stringify(request);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoProblem, setPromoProblem] = useState<PromoProblem | null>(null);
+  const promoRef = useRef<string | null>(null);
+  useEffect(() => {
+    promoRef.current = promoCode;
+  }, [promoCode]);
+  const stay = request as { checkIn?: string; checkOut?: string };
+  const nights = stay.checkIn && stay.checkOut ? diffDays(stay.checkIn, stay.checkOut) : 0;
+
+  const explainPromo = useCallback(
+    (code: string, e: ClientApiError): PromoProblem => ({
+      code: (e.details as { reason?: string } | undefined)?.reason ?? e.code,
+      ...promoMessage(code, { code: e.code, message: e.message, details: e.details }, {
+        nights,
+        roomName: quote?.roomType.name,
+        planName: plan ? `${planTitle(plan)} rate` : undefined,
+        hotelName: hotel.name,
+      }),
+    }),
+    [nights, quote?.roomType.name, plan, hotel.name],
+  );
 
   const fetchQuote = useCallback(
-    async (prev?: Quote | null) => {
+    async (prev?: Quote | null, promo: string | null | undefined = promoRef.current) => {
       setBusy("quote");
       setQuoteError(null);
       try {
-        const q = await call<Quote>("public/quotes", { method: "POST", body: JSON.parse(requestKey), retries: 2 });
+        const body = { ...JSON.parse(requestKey), ...(promo ? { promoCode: promo } : {}) };
+        let q: Quote;
+        try {
+          q = await call<Quote>("public/quotes", { method: "POST", body, retries: 2 });
+        } catch (e) {
+          // A code that stopped working (used up, dates moved): price without it and say why.
+          if (promo && e instanceof ClientApiError && isPromoError(e.code)) {
+            setPromoCode(null);
+            setPromoProblem(explainPromo(promo, e));
+            q = await call<Quote>("public/quotes", { method: "POST", body: JSON.parse(requestKey), retries: 2 });
+          } else throw e;
+        }
         setQuote(q);
         onQuote(q);
         bookKey.current = null;
@@ -97,6 +137,7 @@ export function BookingReview({
         return q;
       } catch (e) {
         if (e instanceof ClientApiError && e.code === "ROOM_UNAVAILABLE") onBack(0, "That room type has just been taken for your dates. Here is what is still free.");
+        else if (e instanceof ClientApiError && (e.code === "STAY_RESTRICTED" || e.code === "RATE_PLAN_UNAVAILABLE")) onBack(0, restrictionMessage(e));
         else if (e instanceof ClientApiError && e.code === "CAPACITY_EXCEEDED") onBack(0, "That room is too small for your group. Choose a larger room or fewer guests.");
         else setQuoteError(humanError(e, "We could not price your stay just now."));
         return null;
@@ -104,8 +145,37 @@ export function BookingReview({
         setBusy(null);
       }
     },
-    [requestKey, onQuote, onBack],
+    [requestKey, onQuote, onBack, explainPromo],
   );
+
+  /** Applies a code by re-pricing the stay with it; the old price stays on screen if it is refused. */
+  async function applyPromo(code: string) {
+    setPromoBusy(true);
+    setPromoProblem(null);
+    setError(null);
+    try {
+      const q = await call<Quote>("public/quotes", { method: "POST", body: { ...JSON.parse(requestKey), promoCode: code }, retries: 1 });
+      if (!q.promo && !(q.breakdown.discountKobo > 0)) {
+        setPromoProblem({ code: "PROMO_NO_SAVING", message: `\u201c${code}\u201d does not lower the price of this stay.`, hint: null });
+        return;
+      }
+      setQuote(q);
+      onQuote(q);
+      bookKey.current = null;
+      setPromoCode(code);
+    } catch (e) {
+      if (e instanceof ClientApiError && (isPromoError(e.code) || e.code === "VALIDATION_ERROR")) setPromoProblem(explainPromo(code, e));
+      else setPromoProblem({ code: "NETWORK", message: humanError(e, "We could not check the code just now."), hint: "Your stay is still priced without it." });
+    } finally {
+      setPromoBusy(false);
+    }
+  }
+
+  async function removePromo() {
+    setPromoCode(null);
+    setPromoProblem(null);
+    await fetchQuote(null, null);
+  }
 
   useEffect(() => {
     if (held) return;
@@ -168,6 +238,9 @@ export function BookingReview({
         }
         case "ROOM_UNAVAILABLE":
           return onBack(0, "Someone booked the last one of that room a moment ago. Here is what is still free for your dates.");
+        case "RATE_PLAN_UNAVAILABLE":
+        case "STAY_RESTRICTED":
+          return onBack(0, restrictionMessage(e));
         case "ONLINE_PAYMENT_UNAVAILABLE":
         case "PAY_AT_HOTEL_UNAVAILABLE":
         case "ONLINE_BOOKING_DISABLED":
@@ -181,6 +254,12 @@ export function BookingReview({
           return setError(Object.values(f).flat().join(" ") || e.message);
         }
         default:
+          if (isPromoError(e.code) && promoCode) {
+            setPromoProblem(explainPromo(promoCode, e));
+            setPromoCode(null);
+            await fetchQuote(q, null);
+            return setError("Your promo code could not be used after all, so the price is now without it. Check the new total, then book.");
+          }
           return setError(humanError(e));
       }
     }
@@ -352,7 +431,7 @@ export function BookingReview({
           The price, from the hotel
         </h3>
         {quote ? (
-          <PriceLedger quote={quote} />
+          <PriceLedger quote={quote} planName={plan ? planTitle(plan) : quote.ratePlan && quote.ratePlan.kind !== "BAR" ? quote.ratePlan.name : null} loading={busy === "quote" || promoBusy} />
         ) : quoteError ? (
           <Notice
             tone="warn"
@@ -372,8 +451,21 @@ export function BookingReview({
             <div className="skeleton h-7 w-1/3 rounded-xs" />
           </div>
         )}
-        {quote ? (
-          <p className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed">
+        {!held ? (
+          <div className="mt-5">
+            <PromoField applied={quote?.promo ?? quote?.breakdown.promo ?? (promoCode && quote && quote.breakdown.discountKobo > 0 ? { code: promoCode, description: null, discountKobo: quote.breakdown.discountKobo } : null)} busy={promoBusy} problem={promoProblem} onApply={applyPromo} onRemove={removePromo} disabled={!quote} />
+          </div>
+        ) : null}
+        {quote && (quote.cancellationPolicy.nonRefundable || quote.ratePlan?.refundable === false || (plan && isNonRefundable(plan))) ? (
+          <p className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed" data-testid="policy-line" data-policy="non-refundable">
+            <LockSimple size={18} weight="fill" className="mt-0.5 shrink-0 text-ink-muted" aria-hidden />
+            <span>
+              <span className="font-medium">Non-refundable.</span>{" "}
+              <span className="text-ink-muted">You pay the whole stay now. If you cancel, change your dates or do not arrive, nothing is refunded.</span>
+            </span>
+          </p>
+        ) : quote ? (
+          <p className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed" data-testid="policy-line" data-policy="flexible">
             <ShieldCheck size={18} weight="fill" className="mt-0.5 shrink-0 text-palm" aria-hidden />
             <span>
               {quote.freeCancellationUntil ? (
@@ -483,36 +575,58 @@ export function BookingReview({
   );
 }
 
-function PriceLedger({ quote }: { quote: Quote }) {
+function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: string | null; loading?: boolean }) {
   const b = quote.breakdown;
-  const [open, setOpen] = useState(false);
+  const varies = nightlyVaries(b);
+  const [open, setOpen] = useState(varies);
   const unit = b.unit === "HOUR" ? "hour" : "night";
   const inclusive = b.taxes.some((t) => t.inclusive);
+  const nightsSum = b.lines.reduce((n, l) => n + l.amountKobo, 0);
+  const promo = quote.promo ?? b.promo ?? null;
+  const seasons = new Map((b.nightly ?? []).map((n) => [n.date, n.ruleName]));
   return (
-    <div className="rounded-sm border border-line-strong bg-surface" data-testid="quote">
+    <div className={`rounded-sm border border-line-strong bg-surface transition-opacity ${loading ? "opacity-60" : ""}`} data-testid="quote">
       <dl className="num space-y-2.5 p-5 text-[13px] sm:text-sm">
         <div className="flex items-baseline gap-3">
           <dt className="font-sans [font-variant-numeric:normal]">
-            {quote.roomType.name}, {b.units} {b.units === 1 ? unit : `${unit}s`} at {formatNaira(b.rateKobo)}
+            {quote.roomType.name}
+            {planName ? <span className="text-ink-muted">, {planName} rate</span> : null},{" "}
+            {varies ? `${b.units} ${unit}s` : `${b.units} ${b.units === 1 ? unit : `${unit}s`} at ${formatNaira(b.rateKobo)}`}
           </dt>
           <span aria-hidden className="leader" />
-          <dd>{formatNaira(b.lines.reduce((n, l) => n + l.amountKobo, 0))}</dd>
+          <dd data-testid="nights-subtotal">{formatNaira(nightsSum)}</dd>
         </div>
         {b.lines.length > 1 ? (
           <div>
             <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 font-sans text-xs text-ink-muted hover:text-ink">
               <CaretDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} aria-hidden /> {open ? "Hide" : "Show"} each night
+              {varies ? <span className="text-ink-muted">: prices change with the dates</span> : null}
             </button>
             {open ? (
-              <ul className="mt-2 space-y-1.5 border-l border-line pl-3 text-[12.5px] text-ink-muted">
+              <ul className="mt-2 space-y-1.5 border-l border-line pl-3 text-[12.5px] text-ink-muted" data-testid="night-lines">
                 {b.lines.map((l) => (
-                  <li key={l.date} className="flex justify-between gap-3">
-                    <span className="font-sans [font-variant-numeric:normal]">{l.description}</span>
-                    <span>{formatNaira(l.amountKobo)}</span>
+                  <li key={l.date} className="flex items-baseline gap-3" data-testid="night-line">
+                    <span className="font-sans [font-variant-numeric:normal]">
+                      <span className="num text-ink">
+                        {formatWeekday(l.date)} {formatShort(l.date)}
+                      </span>
+                      {seasons.get(l.date) ? <span className="ml-2 rounded-xs bg-brass/[0.12] px-1.5 py-px text-[11px] text-ink">{seasons.get(l.date)}</span> : null}
+                    </span>
+                    <span aria-hidden className="leader" />
+                    <span data-testid="night-amount">{formatNaira(l.amountKobo)}</span>
                   </li>
                 ))}
               </ul>
             ) : null}
+          </div>
+        ) : null}
+        {b.discountKobo > 0 ? (
+          <div className="flex items-baseline gap-3 text-palm" data-testid="discount-line">
+            <dt className="inline-flex items-center gap-1.5 font-sans [font-variant-numeric:normal]">
+              <Tag size={14} aria-hidden /> {promo ? `Promo ${promo.code}` : "Discount"}
+            </dt>
+            <span aria-hidden className="leader" />
+            <dd>&minus;{formatNaira(b.discountKobo)}</dd>
           </div>
         ) : null}
         {b.taxes.map((t) => (
@@ -532,9 +646,39 @@ function PriceLedger({ quote }: { quote: Quote }) {
           {formatNaira(b.totalKobo)}
         </span>
       </div>
+      {b.discountKobo > 0 ? (
+        <p className="border-t border-line bg-palm/[0.06] px-5 py-2.5 text-[13px] text-palm" data-testid="saving-line">
+          You save <span className="num font-medium">{formatNaira(b.discountKobo)}</span>
+          {promo ? <> with {promo.code}</> : null}, before taxes. The total above is what you pay.
+        </p>
+      ) : null}
       {inclusive ? <p className="border-t border-line px-5 py-2.5 text-xs text-ink-muted">Some taxes are already inside the room rate, as the hotel sets it.</p> : null}
     </div>
   );
+}
+
+/** A stay the hotel does not sell as asked (restrictions, rate plan rules), in plain words. */
+function restrictionMessage(e: ClientApiError): string {
+  const d = (e.details ?? {}) as { reason?: string; date?: string; minNights?: number; maxNights?: number };
+  const when = d.date ? `${formatWeekday(d.date)} ${formatShort(d.date)}` : "one of your dates";
+  switch (d.reason) {
+    case "CLOSED_TO_ARRIVAL":
+      return `The hotel takes no arrivals on ${when}. Choose another check-in day.`;
+    case "CLOSED_TO_DEPARTURE":
+      return `The hotel takes no departures on ${when}. Choose another check-out day.`;
+    case "STOP_SELL":
+      return `The night of ${when} is not for sale online. Try other dates, or call the hotel.`;
+    case "MIN_NIGHTS":
+      return d.minNights ? `Stays ${d.date ? `arriving ${when} ` : ""}are at least ${d.minNights} nights. Add a night or two.` : "Your stay is too short for these dates.";
+    case "MAX_NIGHTS":
+      return d.maxNights ? `That rate is for stays of up to ${d.maxNights} nights. Choose another rate.` : "That rate is not for a stay this long.";
+    case "CHANNEL":
+    case "INACTIVE":
+    case "ROOM_TYPE":
+      return "That rate is no longer offered for this room. Choose another rate.";
+    default:
+      return e.message || "That rate is no longer open for your dates. Choose another rate or change the dates.";
+  }
 }
 
 export function toHeld(booking: BookingView, manageToken: string, p: PaymentInit): Held {

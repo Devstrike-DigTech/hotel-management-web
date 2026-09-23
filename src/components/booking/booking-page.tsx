@@ -17,7 +17,7 @@ export function BookingPage({
 }: {
   hotel: HotelDetail;
   today: ISODate;
-  initial: { room: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
+  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
   hotelHref: string;
   channel: BookingChannel;
   confirmPath: string;

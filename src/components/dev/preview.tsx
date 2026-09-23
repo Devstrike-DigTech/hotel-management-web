@@ -8,6 +8,8 @@ import { PaymentState, type PaymentPhase } from "@/components/booking/payment-st
 import { ReviewItem } from "@/components/reviews/review-parts";
 import { StarInput } from "@/components/reviews/stars";
 import { APP_NAME } from "@/lib/env";
+import type { ISODate } from "@/lib/dates";
+import { PreviewRates } from "./preview-rates";
 
 const SAMPLE: ConfirmationData = {
   code: "PWH-7K3Q9",
@@ -42,8 +44,8 @@ const SAMPLE: ConfirmationData = {
   cancellationNote: "Free cancellation until Tue 6 Oct, 2:00 pm. After that, the first night is charged.",
 };
 
-/** Development-only gallery of the M3 building blocks, for design review. */
-export function Preview({ only }: { only?: string }) {
+/** Development-only gallery of the M3 and M4 building blocks, for design review. */
+export function Preview({ only, today }: { only?: string; today: ISODate }) {
   const [otp, setOtp] = useState("");
   const [bad, setBad] = useState(false);
   const [stars, setStars] = useState(4);
@@ -57,6 +59,7 @@ export function Preview({ only }: { only?: string }) {
 
   return (
     <div className="container-page space-y-20 py-12">
+      {show("rates") ? <PreviewRates today={today} /> : null}
       {show("card") ? (
         <section className="space-y-10">
           <ConfirmationCard data={SAMPLE} appName={APP_NAME} />
