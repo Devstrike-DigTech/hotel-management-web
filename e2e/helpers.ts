@@ -45,13 +45,32 @@ export function newGuest(): GuestInfo {
  * Walks the booking flow from the book page to the review step and submits it.
  * Returns once the hold panel (online) or the confirmation (pay at hotel) is showing.
  */
-export async function bookRoom(page: Page, opts: { slug: string; stay: { checkIn: string; checkOut: string }; guest: GuestInfo; pay: "ONLINE" | "PAY_AT_HOTEL"; base?: string }) {
+export async function bookRoom(
+  page: Page,
+  opts: {
+    slug: string;
+    stay: { checkIn: string; checkOut: string };
+    guest: GuestInfo;
+    pay: "ONLINE" | "PAY_AT_HOTEL";
+    base?: string;
+    /** M4: pick this rate plan kind in step one (e.g. "NON_REFUNDABLE"). */
+    planKind?: string;
+    /** M4: apply this promo code in the review step, and wait for it to be accepted. */
+    promo?: string;
+  },
+) {
   const base = opts.base ?? `/stays/${opts.slug}`;
   await page.goto(`${base}/book?checkIn=${opts.stay.checkIn}&checkOut=${opts.stay.checkOut}&guests=2`);
   // Step one: the first room type that is free for the dates (live availability).
   const option = page.getByTestId("room-option").filter({ hasText: /Free for your dates|Only \d+ left/ }).first();
   await expect(option).toBeVisible();
   await option.click();
+  if (opts.planKind) {
+    const plan = page.locator(`[data-testid="plan-option"][data-plan-kind="${opts.planKind}"]`);
+    await expect(plan).toBeVisible();
+    await plan.click();
+    await expect(plan.locator("input")).toBeChecked();
+  }
   await page.getByTestId("booking-next").click();
   // Step two: details.
   await page.getByTestId("guest-name").fill(opts.guest.name);
@@ -60,6 +79,12 @@ export async function bookRoom(page: Page, opts: { slug: string; stay: { checkIn
   await page.getByTestId("booking-next").click();
   // Step three: the authoritative quote, then pay.
   await expect(page.getByTestId("quote-total")).toBeVisible();
+  if (opts.promo) {
+    await page.getByTestId("promo-open").click();
+    await page.getByTestId("promo-input").fill(opts.promo);
+    await page.getByTestId("promo-apply").click();
+    await expect(page.getByTestId("promo-applied")).toBeVisible();
+  }
   await page.getByTestId(`pay-${opts.pay}`).click();
   await page.getByTestId("consent").check();
   await page.getByTestId("book-submit").click();

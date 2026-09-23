@@ -18,7 +18,7 @@ import { downloadIcs, googleCalendarUrl, mapsUrl, type StayEvent } from "@/lib/i
 export interface ConfirmationLine {
   label: string;
   amountKobo: number;
-  kind?: "charge" | "tax" | "discount";
+  kind?: "charge" | "tax" | "discount" | "note";
 }
 
 export interface ConfirmationData {
@@ -140,7 +140,14 @@ export function ConfirmationCard({ data, appName, shareUrl }: { data: Confirmati
         <div className="min-w-0">
         <dl className="num space-y-2.5 text-[13px] sm:text-sm">
           {data.lines.map((l, i) => (
-            <LedgerRow key={i} label={l.label} value={l.kind === "discount" ? `-${formatNaira(Math.abs(l.amountKobo))}` : formatNaira(l.amountKobo)} muted={l.kind === "tax"} />
+            l.kind === "note" ? (
+              <div key={i} className="-mt-1 font-sans text-[12px] italic text-ink-muted [font-variant-numeric:normal]">
+                <dt className="sr-only">Rate</dt>
+                <dd data-testid="card-rate">{l.label}</dd>
+              </div>
+            ) : (
+              <LedgerRow key={i} label={l.label} value={l.kind === "discount" ? `-${formatNaira(Math.abs(l.amountKobo))}` : formatNaira(l.amountKobo)} muted={l.kind === "tax"} tone={l.kind === "discount" ? "text-palm" : ""} testId={l.kind === "discount" ? "card-discount" : undefined} />
+            )
           ))}
           <div className="flex items-baseline gap-3 border-t border-ink pt-3">
             <dt className="font-sans text-[0.9375rem] font-medium [font-variant-numeric:normal]">Total</dt>

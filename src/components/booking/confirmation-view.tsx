@@ -51,6 +51,12 @@ export function toConfirmation(b: BookingView, manageHref: string | null): Confi
         label: `${b.roomType.name}, ${b.breakdown.units} ${b.breakdown.units === 1 ? unit : `${unit}s`}${b.breakdown.lines.length > 1 && new Set(b.breakdown.lines.map((l) => l.amountKobo)).size === 1 ? ` at ${formatNaira(b.breakdown.rateKobo)}` : ""}`,
         amountKobo: room,
       },
+      ...(b.ratePlan && !/^(bar|best available( rate)?|flexible)$/i.test(b.ratePlan.name)
+        ? [{ label: `${b.ratePlan.name} rate${b.ratePlan.includesBreakfast ? ", breakfast included" : ""}`, amountKobo: 0, kind: "note" as const }]
+        : []),
+      ...(b.breakdown.discountKobo > 0
+        ? [{ label: b.promo?.code || b.breakdown.promo?.code ? `Promo ${b.promo?.code ?? b.breakdown.promo?.code}` : "Discount", amountKobo: -b.breakdown.discountKobo, kind: "discount" as const }]
+        : []),
       ...b.breakdown.taxes.map((t) => ({ label: `${t.label} ${t.rateBps / 100}%${t.inclusive ? ", included" : ""}`, amountKobo: t.amountKobo, kind: "tax" as const })),
     ],
     totalKobo: b.totalKobo,
@@ -62,7 +68,11 @@ export function toConfirmation(b: BookingView, manageHref: string | null): Confi
     paymentLabel: paidLabel,
     manageHref,
     icsHref: b.calendarUrl,
-    cancellationNote: b.status === "CANCELLED" ? null : b.freeCancellationUntil ? `Free cancellation until ${formatLagosDateTime(b.freeCancellationUntil)}. ${policyTail(b.cancellationPolicy.summary)}` : b.cancellationPolicy.summary,
+    cancellationNote: b.status === "CANCELLED"
+      ? null
+      : b.cancellationPolicy.nonRefundable || b.ratePlan?.refundable === false
+        ? "Non-refundable: the full amount is kept if the booking is cancelled or the guest does not arrive."
+        : b.freeCancellationUntil ? `Free cancellation until ${formatLagosDateTime(b.freeCancellationUntil)}. ${policyTail(b.cancellationPolicy.summary)}` : b.cancellationPolicy.summary,
   };
 }
 
