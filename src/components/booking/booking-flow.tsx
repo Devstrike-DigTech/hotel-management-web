@@ -647,6 +647,7 @@ const NUMERALS = ["i", "ii", "iii", "iv", "v"];
 
 function Stepper({ labels, step, onStep, locked }: { labels: string[]; step: number; onStep: (i: number) => void; locked: boolean }) {
   return (
+    <>
     <ol className={`grid border-b border-line ${labels.length === 4 ? "grid-cols-4" : "grid-cols-3"}`} aria-label="Booking steps">
       {labels.map((label, i) => {
         const done = i < step;
@@ -661,7 +662,7 @@ function Stepper({ labels, step, onStep, locked }: { labels: string[]; step: num
               className={`flex w-full items-baseline gap-2.5 pb-3 text-left ${done && !locked ? "cursor-pointer hover:text-laterite" : "cursor-default"}`}
             >
               <span className={`font-display text-lg italic ${current || done ? "text-laterite" : "text-ink-muted"}`}>{NUMERALS[i]}.</span>
-              <span className={`text-sm ${current ? "text-ink" : "text-ink-muted max-sm:sr-only"}`}>{label}</span>
+              <span className={`text-sm max-sm:sr-only ${current ? "text-ink" : "text-ink-muted"}`}>{label}</span>
               {done ? <Check size={13} className="text-laterite max-sm:hidden" aria-hidden /> : null}
             </button>
             <span aria-hidden className={`absolute -bottom-px left-0 h-[2px] transition-all duration-500 ${i <= step ? "w-full bg-laterite" : "w-0"}`} />
@@ -669,6 +670,9 @@ function Stepper({ labels, step, onStep, locked }: { labels: string[]; step: num
         );
       })}
     </ol>
+    {/* Phones: the numerals above, the current step's name spelled out once below. */}
+    <p aria-hidden className="mt-2 text-sm text-ink sm:hidden">{labels[step]}</p>
+    </>
   );
 }
 

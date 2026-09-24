@@ -24,47 +24,11 @@ export const KIND_PLURAL: Record<PickupKind, string> = {
 /** How a traveller arrives at each kind of place, for the sentence under its heading. */
 export const KIND_ARRIVAL: Record<PickupKind, string> = {
   AIRPORT: "Give us your flight and we watch it land.",
-  MOTOR_PARK: "Coming by road with GIGM, ABC, Peace Mass Transit or another line? Tell us the company and roughly when the bus gets in.",
+  MOTOR_PARK: "Coming by road with God is Good, ABC, Peace Mass Transit or another line? Tell us the company and roughly when the bus gets in.",
   TRAIN_STATION: "Tell us the route and the service, and we meet the train.",
   JETTY: "Tell us the boat and when it docks.",
   OTHER: "Tell us where and when.",
 };
-
-/**
- * The seeded Nigerian inter-city transport lines, deduplicated ("Young Shall Grow" appears once).
- * Hotels can add their own local companies; "Other" takes free text.
- */
-export const TRANSPORT_COMPANIES = [
-  "GIGM (God is Good Motors)",
-  "ABC Transport",
-  "Peace Mass Transit",
-  "Chisco",
-  "GUO",
-  "Libra Motors",
-  "The Young Shall Grow",
-  "Efex",
-  "Cross Country",
-  "Area Motors",
-  "Okeyson",
-  "Greener Line",
-  "Agofure",
-  "Ifesinachi",
-];
-
-export const TRAIN_ROUTES = ["Lagos to Ibadan", "Abuja to Kaduna", "Warri to Itakpe"];
-
-export function transportCompanies(extra: unknown): string[] {
-  const own = Array.isArray(extra) ? extra.filter((x): x is string => typeof x === "string" && !!x.trim()).map((x) => x.trim()) : [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const name of [...TRANSPORT_COMPANIES, ...own]) {
-    const k = name.toLowerCase().replace(/^the\s+/, "").replace(/\s*\(.*\)$/, "");
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(name);
-  }
-  return out;
-}
 
 /** The one-way price for a direction and vehicle. */
 export function transferPrice(point: PickupPoint, direction: "ARRIVAL" | "DEPARTURE", vehicle?: VehicleOption | null): number {

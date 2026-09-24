@@ -53,6 +53,14 @@ test.describe("booking-site templates", () => {
   }
 
   test("boutique renders from the seeded draft behind a preview token", async ({ page, request }) => {
+    // The seed leaves a Boutique draft on Palmwine Lekki; other suites (the admin's Brand Studio tests)
+    // may have published or discarded it since, so put it back first.
+    const staff = { authorization: `Bearer ${await staffToken(request)}` };
+    const state = (await (await request.get(`${API}/site/theme`, { headers: staff })).json()) as { draft: { templateId: string } };
+    if (state.draft.templateId !== "boutique") {
+      const put = await request.put(`${API}/site/theme/draft`, { headers: { ...staff, "idempotency-key": `web-e2e-${Date.now()}` }, data: { templateId: "boutique", brand: { fontPairingId: "cormorant-manrope" } } });
+      expect(put.ok(), await put.text()).toBeTruthy();
+    }
     const token = await previewToken(request, ["THEME"]);
     await page.goto(`/h/palmwine-house?preview=${token}`);
     await expectTemplate(page, "boutique", "[data-hero-bleed]");

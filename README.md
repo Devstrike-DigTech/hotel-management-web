@@ -667,11 +667,14 @@ The Essentials page is built only from server components, so its HTML is complet
 three inline ones: the theme resolver, the site's colour mode, and a script under a kilobyte for the light/dark switch and fonts
 after first paint. Script and web-font preloads go too; JSON-LD stays. The response carries `x-lite: 1`.
 
-| Page (production build, gzip as `next start` serves it) | Script files | Inline | Total |
+| Page (production build, gzip as `next start` serves it, live seed) | Script files | Inline | Total script |
 |---|---|---|---|
-| Essentials home (`/h/bodija-heights`) | 0 | 1.0 KB | **1.0 KB** (budget 120 KB) |
-| Editorial home, for comparison | 12 files, 200 KB | 108 KB | 308 KB |
-| A booking page (React app, any template) | 15 files, 261 KB | 53 KB | 314 KB |
+| Essentials home (`/h/bodija-heights`) | 0 | 1.1 KB | **1.1 KB** (budget 120 KB) |
+| Editorial home (`/h/palmwine-house`), for comparison | 12 files, 200 KB | 115 KB (RSC payload) | 316 KB |
+| Business home (`/h/palmwine-house-ikoyi`) | 12 files, 200 KB | 88 KB | 288 KB |
+| A booking page (the React app, any template) | 15 files, 261 KB | 43 KB | 304 KB |
+
+The whole Essentials first load is the HTML (5.9 KB gzipped), one stylesheet (25 KB) and small lazy thumbnails below the fold.
 
 The framework alone is about 130 KB gzipped (110 KB brotli), so no hydrated page could meet the budget; serving the Essentials home
 without it is what does. The booking page after it is the normal app. `pnpm perf:essentials [url ...] [--report url]` measures the
@@ -820,6 +823,24 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
   that way (it pays online through the mock checkout when a hotel offers it).
 - The spec's `info.description` points to "Settings > Integrations" in the hotel admin; the admin's area is "Developers" (API keys,
   Webhooks), which the docs link to.
+
+## Contract notes (M7)
+
+- The public theme, booking form, extras, pickup points and transfers match `API-M7.md` against the live backend and its M7 seed.
+  The web reads `HotelDetail.siteTheme` (and `GET /public/hotels/:slug/theme?preview=&host=` for drafts), `colours.light` /
+  `colours.dark` (`primaryText` for text, `primary` + `onPrimary` for fills), the pairing's single `googleFontsUrl`, and the
+  `getting-here` section's `resolved.pickupPoints` (falling back to `/public/hotels/:slug/pickup-points`).
+- `location-map`'s `staticMapUrl` is not used: the page draws its own map card and links to Google Maps, so no third-party tile
+  image loads (and nothing is fetched on Essentials).
+- The seeded transport list names the first company "GIG Mobility (God is Good Motors)" where the brief says "GIGM (God is Good
+  Motors)"; the web shows whatever the form sends.
+- The seed gives Bodija Heights (the Essentials demo) the primary colour `#7C3AED`, a violet the house design language avoids; the
+  web renders the hotel's choice after the server's contrast guard. Worth a warmer seed colour.
+- The demo data is shared with the other apps' suites: the admin's Brand Studio tests publish and discard Palmwine Lekki's theme
+  draft. The M7 web test puts the seeded Boutique draft back before previewing it rather than assuming it is still there.
+- Draft previews never book: the final button is switched off (the API refuses draft answers anyway, API-M7 8.3); quotes still work.
+- With add-ons, `breakdown.totalKobo` includes them and each add-on's tax is inside the tax lines; the ledgers show each add-on at its
+  net price above the taxes, so the lines always add up to the total.
 
 ## Not done yet
 
