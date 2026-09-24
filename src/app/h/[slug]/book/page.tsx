@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BookingPage } from "@/components/booking/booking-page";
 import { normaliseStay, todayInLagos } from "@/lib/dates";
 import { getHotel, siteBase } from "@/lib/site";
+import { previewToken } from "@/lib/theme/server";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -16,6 +17,8 @@ export default async function MicrositeBook({ params, searchParams }: PageProps<
   const base = await siteBase(slug);
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
+  const preview = await previewToken();
+  const formChannel = preview && one(sp.channel) === "MARKETPLACE" ? "MARKETPLACE" : undefined;
   return (
     <BookingPage
       hotel={hotel}
@@ -23,6 +26,8 @@ export default async function MicrositeBook({ params, searchParams }: PageProps<
       hotelHref={base || "/"}
       channel="BOOKING_SITE"
       confirmPath={`${base}/booking/confirmation`}
+      preview={preview}
+      formChannel={formChannel}
       initial={{ room: one(sp.room) || null, plan: one(sp.plan) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
     />
   );

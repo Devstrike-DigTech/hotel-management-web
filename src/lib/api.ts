@@ -162,6 +162,18 @@ export const api = {
       throw err;
     }
   },
+  /**
+   * M7: the published booking form for a channel (API-M7 2.9), or the draft behind a preview token.
+   * Null before M7 (the web then uses its built-in form).
+   */
+  bookingForm: async (slug: string, channel: string, preview?: string | null): Promise<unknown | null> => {
+    try {
+      return await request<unknown>(`/public/hotels/${encodeURIComponent(slug)}/booking-form${qs({ channel, preview })}`, preview ? { revalidate: false } : { revalidate: 30, tags: [`form:${slug}`] });
+    } catch (err) {
+      if (err instanceof ApiError && [400, 401, 403, 404, 410].includes(err.status)) return null;
+      throw err;
+    }
+  },
   /** M7: a hotel's pickup points (arrival and departure transfers). */
   pickupPoints: async (slug: string): Promise<unknown[]> => {
     try {

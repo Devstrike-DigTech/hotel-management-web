@@ -17,7 +17,7 @@ import {
   UsersThree,
 } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BookingChannel, GuestAccount, HotelBookingInfo, Quote, RoomTypeAvailability } from "@/lib/booking-types";
 import { call, draft } from "@/lib/client-api";
 import { addDays, diffDays, formatMonthShort, formatShort, formatWeekday, type ISODate } from "@/lib/dates";
@@ -25,11 +25,11 @@ import { formatClock, formatNaira, formatPhone, toE164Digits } from "@/lib/forma
 import type { RoomTypePublic } from "@/lib/types";
 import { useOnline } from "@/lib/use-online";
 import { notifySession, useGuestHint } from "../account/account-link";
-import { PhoneSignIn, validNigerianMobile } from "../account/phone-sign-in";
+import { PhoneSignIn } from "../account/phone-sign-in";
 import { GuestsStepper } from "../search/guests-stepper";
 import { RangeCalendar, type Range } from "../search/range-calendar";
 import { useMedia } from "../search/use-dismiss";
-import { Field, FieldError, Notice } from "../ui/field";
+import { FieldError, Notice } from "../ui/field";
 import { Plate } from "../ui/plate";
 import { BookingReview, type Held } from "./booking-review";
 import { BookingSummary } from "./booking-summary";
@@ -37,6 +37,27 @@ import { PlanChoice } from "./rate-plans";
 import { useAvailability, type AvailabilityQuery } from "./use-availability";
 import { usePriceCalendar } from "./use-price-calendar";
 import { plansFor, planTitle, type PlanOffer } from "@/lib/rates";
+import {
+  answerFields,
+  checkField,
+  groupBySection,
+  GUEST_KEYS,
+  isAddOnField,
+  isVisible,
+  issueTarget,
+  transfersFor,
+  type Answers,
+  type AnswerValue,
+  type ExtraSelection,
+  type FormField,
+  type PickupAnswer,
+  type PublicBookingForm,
+  type PublicExtra,
+  type ValidationIssue,
+} from "@/lib/booking-form";
+import { ExtrasPicker } from "./extras-picker";
+import { FormFieldInput } from "./form-fields";
+import { checkPickup, PickupBlock, type PickupContext } from "./pickup-block";
 
 export interface BookingHotel {
   slug: string;
@@ -76,33 +97,49 @@ export interface GuestForm {
   fullName: string;
   phone: string;
   email: string;
-  arrival: string;
-  requests: string;
 }
 
-const STEPS = ["Your stay", "Your details", "Review and pay"] as const;
-const WORDS = ["one", "two", "three"];
+type StepKey = "stay" | "details" | "addons" | "review";
+const STEP_LABEL: Record<StepKey, string> = { stay: "Your stay", details: "Your details", addons: "Extras and getting here", review: "Review and pay" };
+const WORDS = ["one", "two", "three", "four", "five"];
 
 interface Draft {
-  v: 2;
+  v: 3;
   guest: GuestForm;
+  answers: Answers;
+  extras: ExtraSelection[];
   held: (Held & { roomId: string; planId?: string; kind: StayKind; range: Range; dayUse: DayUse; adults: number; children: number }) | null;
 }
+
+/** Errors on the form, keyed by field key (and "fieldKey.sub" for parts of the pickup block, "extra:<id>" for extras). */
+type FormErrors = Record<string, string>;
 
 export function BookingFlow({
   hotel,
   site,
   today,
   initial,
+  form,
+  preview = null,
 }: {
   hotel: BookingHotel;
   site: BookingSite;
   today: ISODate;
   initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
+  /** M7: the hotel's published booking form for this channel (or the draft in preview). */
+  form: PublicBookingForm;
+  /** M7: the preview token when the admin is previewing a draft form (booking is switched off). */
+  preview?: string | null;
 }) {
   const rooms = useMemo(() => [...hotel.roomTypes].sort((a, b) => a.basePriceKobo - b.basePriceKobo), [hotel.roomTypes]);
   const draftKey = `booking:${hotel.slug}:${site.channel}`;
   const [step, setStep] = useState(0);
+  // M7: the form decides whether extras and the pickup get a step of their own.
+  const guestFields = useMemo(() => answerFields(form), [form]);
+  const hasAddOns = guestFields.some((f) => isAddOnField(f));
+  const steps: StepKey[] = hasAddOns ? ["stay", "details", "addons", "review"] : ["stay", "details", "review"];
+  const stepKey: StepKey = step < 0 ? "review" : steps[Math.min(step, steps.length - 1)];
+  const reviewIndex = steps.length - 1;
   const [roomId, setRoomId] = useState<string | undefined>(rooms.some((r) => r.id === initial.room) ? initial.room! : undefined);
   const [kind, setKind] = useState<StayKind>("overnight");
   const [planPick, setPlanPick] = useState<string | undefined>(initial.plan ?? undefined);
@@ -110,7 +147,10 @@ export function BookingFlow({
   const [dayUse, setDayUse] = useState<DayUse>({ date: today, from: "12:00", hours: 3 });
   const [adults, setAdults] = useState(Math.max(1, Math.min(initial.guests, 10)));
   const [children, setChildren] = useState(0);
-  const [guest, setGuest] = useState<GuestForm>({ fullName: "", phone: "", email: "", arrival: "", requests: "" });
+  const [guest, setGuest] = useState<GuestForm>({ fullName: "", phone: "", email: "" });
+  const [answers, setAnswers] = useState<Answers>({});
+  const [extras, setExtras] = useState<ExtraSelection[]>([]);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [errors, setErrors] = useState<Partial<Record<keyof GuestForm | "dates" | "room" | "plan", string>>>({});
   const [held, setHeld] = useState<Held | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -147,9 +187,11 @@ export function BookingFlow({
   /* Restore: guest details always; a room hold only while it is still running (back from Paystack). */
   useEffect(() => {
     const d = draft.get<Draft>(draftKey);
-    if (!d || d.v !== 2) return;
+    if (!d || d.v !== 3) return;
     const t = setTimeout(() => {
       setGuest((g) => ({ ...g, ...d.guest }));
+      setAnswers((a) => ({ ...d.answers, ...a }));
+      setExtras((x) => (x.length ? x : (d.extras ?? [])));
       if (d.held && new Date(d.held.holdExpiresAt).getTime() > Date.now()) {
         setRoomId(d.held.roomId);
         if (d.held.planId) setPlanPick(d.held.planId);
@@ -159,7 +201,7 @@ export function BookingFlow({
         setAdults(d.held.adults);
         setChildren(d.held.children);
         setHeld({ ...d.held, restored: true });
-        setStep(2);
+        setStep(Number.MAX_SAFE_INTEGER);
       }
     }, 0);
     return () => clearTimeout(t);
@@ -167,11 +209,13 @@ export function BookingFlow({
 
   useEffect(() => {
     draft.set(draftKey, {
-      v: 2,
+      v: 3,
       guest,
+      answers,
+      extras,
       held: held && roomId ? { ...held, roomId, planId: plan?.id, kind: effectiveKind, range, dayUse, adults, children } : null,
     } satisfies Draft);
-  }, [draftKey, guest, held, roomId, plan?.id, effectiveKind, range, dayUse, adults, children]);
+  }, [draftKey, guest, answers, extras, held, roomId, plan?.id, effectiveKind, range, dayUse, adults, children]);
 
   /* A signed-in guest: fetch the account and fill in what we know. */
   useEffect(() => {
@@ -199,9 +243,74 @@ export function BookingFlow({
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [step]);
 
+  const cond = useMemo(() => ({ answers, adults, children }), [answers, adults, children]);
+  const visible = useCallback((f: FormField) => isVisible(f, form, cond), [form, cond]);
+  const detailFields = guestFields.filter((f) => !isAddOnField(f) && visible(f));
+  const addOnFields = guestFields.filter((f) => isAddOnField(f) && visible(f));
+  const pickupField = addOnFields.find((f) => f.type === "PICKUP") ?? null;
+  const extraField = addOnFields.find((f) => f.type === "EXTRA") ?? null;
+  const pickupAnswer = pickupField ? (answers[pickupField.key] as PickupAnswer | undefined) : undefined;
+  const persons = adults + children;
+  const pickupCtx: PickupContext = {
+    arrivalDate: effectiveKind === "dayuse" ? dayUse.date : range.checkIn,
+    departureDate: effectiveKind === "dayuse" ? dayUse.date : range.checkOut,
+    checkOutTime: hotel.checkOutTime,
+    guestPhone: guest.phone,
+    party: persons,
+    hotelPhone: hotel.phone,
+  };
+
+  /* M7: extras priced for the chosen dates and party (the form's own list is the fallback). */
+  const [liveExtras, setLiveExtras] = useState<{ key: string; list: PublicExtra[] } | null>(null);
+  const extrasKey = extraField && stepKey === "addons" ? JSON.stringify([effectiveKind, range, dayUse, adults, children]) : null;
+  useEffect(() => {
+    if (!extrasKey) return;
+    const ctl = new AbortController();
+    const query =
+      effectiveKind === "dayuse"
+        ? { channel: site.channel, date: dayUse.date, startTime: dayUse.from, hours: dayUse.hours, adults, children }
+        : { channel: site.channel, checkIn: range.checkIn, checkOut: range.checkOut, adults, children };
+    call<PublicExtra[]>(`public/hotels/${encodeURIComponent(hotel.slug)}/extras`, { query, signal: ctl.signal })
+      .then((list) => setLiveExtras({ key: extrasKey, list: Array.isArray(list) ? list : [] }))
+      .catch(() => undefined);
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extrasKey]);
+  const extrasList = (liveExtras?.key === extrasKey && liveExtras.list.length ? liveExtras.list : form.extras).filter(
+    (e) => !extraField?.extra?.categories || extraField.extra.categories.includes(e.category),
+  );
+
+  const setAnswer = (key: string, v: AnswerValue) => {
+    setAnswers((a) => ({ ...a, [key]: v }));
+    setFormErrors((e) => {
+      if (!Object.keys(e).some((k) => k === key || k.startsWith(`${key}.`))) return e;
+      const next = { ...e };
+      for (const k of Object.keys(next)) if (k === key || k.startsWith(`${key}.`)) delete next[k];
+      return next;
+    });
+  };
+  const guestValue = (key: string) => (key === "fullName" ? guest.fullName : key === "phone" ? guest.phone : guest.email);
+  const valueOf = (f: FormField): AnswerValue | undefined => (GUEST_KEYS.has(f.key) ? guestValue(f.key) : answers[f.key]);
+
+  /** Checks one step's fields; returns the errors (empty when it may continue). */
+  function checkStep(key: StepKey): FormErrors {
+    const e: FormErrors = {};
+    const fields = key === "details" ? detailFields : key === "addons" ? addOnFields : [];
+    for (const f of fields) {
+      if (f.type === "PICKUP") {
+        for (const [k, m] of Object.entries(checkPickup(answers[f.key] as PickupAnswer | undefined, form.pickup?.points ?? [], pickupCtx))) e[`${f.key}.${k}`] = m;
+        continue;
+      }
+      // Email is only required to pay online; that is asked at review, once the guest has chosen.
+      const m = checkField(f, valueOf(f), { emailRequired: false });
+      if (m) e[f.key] = m;
+    }
+    return e;
+  }
+
   function next() {
     const e: typeof errors = {};
-    if (step === 0) {
+    if (stepKey === "stay") {
       if (!room) e.room = "Choose a room type.";
       else if (live && !live.bookable)
         e.room =
@@ -214,16 +323,57 @@ export function BookingFlow({
         else if (plan.minNights && nights < plan.minNights) e.plan = `The ${planTitle(plan)} rate needs at least ${plan.minNights} nights; your stay is ${nights}.`;
       }
     }
-    if (step === 1) {
-      if (guest.fullName.trim().split(/\s+/).length < 2) e.fullName = "Enter your first and last name, as on your ID.";
-      if (!validNigerianMobile(guest.phone)) e.phone = "Enter a Nigerian mobile number, for example 0803 123 4567.";
-      if (!/^\S+@\S+\.\S+$/.test(guest.email.trim())) e.email = "Enter an email address for your confirmation and receipt.";
-    }
     setErrors(e);
-    if (Object.keys(e).length) return;
+    const fe = checkStep(stepKey);
+    setFormErrors(fe);
+    if (Object.keys(e).length || Object.keys(fe).length) {
+      // Take the guest to the first problem.
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]')?.focus?.(), 50);
+      return;
+    }
     setFlash(null);
-    setStep((s) => Math.min(s + 1, 2));
+    setStep((s) => Math.min(s + 1, reviewIndex));
   }
+
+  /** Server issues (quote or booking): back to the step that holds the first one, each under its field. */
+  const showIssues = (issues: ValidationIssue[], message?: string) => {
+      const fe: FormErrors = {};
+      const ge: typeof errors = {};
+      let target: StepKey = "review";
+      const rank = (k: StepKey) => steps.indexOf(k);
+      const want = (k: StepKey) => {
+        if (rank(k) >= 0 && rank(k) < rank(target)) target = k;
+      };
+      for (const i of issues) {
+        const t = issueTarget(i.path);
+        if (!t) continue;
+        if (t.kind === "guest") {
+          if (t.key === "email") {
+            fe.email = i.message;
+            continue; // shown at review, beside the payment choice
+          }
+          fe[t.key] = i.message;
+          want("details");
+        } else if (t.kind === "answer") {
+          fe[t.sub ? `${t.key}.${t.sub}` : t.key] = i.message;
+          const f = form.fields.find((x) => x.key === t.key);
+          want(f && isAddOnField(f) ? "addons" : "details");
+        } else if (t.kind === "extras") {
+          const sel = extras[t.index];
+          if (sel) fe[`extra:${sel.extraId}`] = i.message;
+          want("addons");
+        } else if (t.kind === "transfers" && pickupField) {
+          const sub = t.sub === "scheduledAt" ? (transfersFor(pickupAnswer)[t.index]?.direction === "DEPARTURE" ? "departure.scheduledAt" : "scheduledAt") : (t.sub ?? "pickupPointId");
+          fe[`${pickupField.key}.${sub}`] = i.message;
+          want("addons");
+        }
+      }
+      setFormErrors(fe);
+      setErrors(ge);
+      setHeld(null);
+      setFlash(message ?? (target === "review" ? null : "Please check the highlighted answers."));
+      setStep(rank(target));
+  };
 
   async function signOut() {
     try {
@@ -233,6 +383,8 @@ export function BookingFlow({
     setAccount(null);
   }
 
+  const transfers = transfersFor(pickupAnswer && pickupField && visible(pickupField) ? pickupAnswer : null);
+  const chosenExtras = extraField ? extras.filter((x) => extrasList.some((e) => e.id === x.extraId && e.available !== false)) : [];
   const quoteRequest = room
     ? {
         hotelSlug: hotel.slug,
@@ -244,13 +396,22 @@ export function BookingFlow({
           : { stayType: "NIGHTLY" as const, checkIn: range.checkIn!, checkOut: range.checkOut! }),
         adults,
         children,
+        ...(chosenExtras.length ? { extras: chosenExtras } : {}),
+        ...(transfers.length ? { transfers } : {}),
       }
     : null;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_24rem] lg:gap-14">
       <div className="min-w-0">
-        <Stepper step={step} locked={!!held} onStep={(i) => i < step && !held && setStep(i)} />
+        <Stepper labels={steps.map((k) => STEP_LABEL[k])} step={steps.indexOf(stepKey)} locked={!!held} onStep={(i) => i < steps.indexOf(stepKey) && !held && setStep(i)} />
+        {preview ? (
+          <div className="mt-6">
+            <Notice tone="info" title="Draft preview of the booking form">
+              This is how guests will see your unpublished form. Everything works except the final booking.
+            </Notice>
+          </div>
+        ) : null}
         {!online ? (
           <div className="mt-6">
             <Notice tone="warn" title="You are offline">
@@ -279,8 +440,9 @@ export function BookingFlow({
               <Notice tone="warn" title={flash} />
             </div>
           ) : null}
-          {step === 0 ? (
+          {stepKey === "stay" ? (
             <StepStay
+              total={steps.length}
               rooms={rooms}
               roomId={roomId}
               setRoomId={setRoomId}
@@ -309,11 +471,20 @@ export function BookingFlow({
               calendar={calendar}
             />
           ) : null}
-          {step === 1 ? (
+          {stepKey === "details" ? (
             <StepGuest
+              n={1}
+              total={steps.length}
               guest={guest}
-              setGuest={setGuest}
-              errors={errors}
+              setGuest={(g) => {
+                setGuest(g);
+                setFormErrors((e) => {
+                  const next = { ...e };
+                  for (const k of GUEST_KEYS) if (g[k as keyof GuestForm] !== guest[k as keyof GuestForm]) delete next[k];
+                  return next;
+                });
+              }}
+              errors={formErrors}
               account={account}
               signingIn={signingIn}
               setSigningIn={setSigningIn}
@@ -329,31 +500,108 @@ export function BookingFlow({
                 }));
               }}
               onSignOut={signOut}
+              fields={detailFields}
+              answers={answers}
+              setAnswer={setAnswer}
+              emailOptional={!form.rules.emailRequiredFor.includes("PAY_AT_HOTEL") && form.fields.find((f) => f.key === "email")?.required !== "REQUIRED"}
+              upload={{ slug: hotel.slug, channel: site.channel, preview, maxFileMB: form.uploads.maxFileMB }}
             />
           ) : null}
-          {step === 2 && quoteRequest ? (
+          {stepKey === "addons" ? (
+            <div data-testid="step-addons">
+              <StepTitle n={2} total={steps.length}>
+                Extras and <em className="accent">getting here</em>
+              </StepTitle>
+              <div className="space-y-12">
+                {groupBySection(addOnFields).map((g) => (
+                  <section key={g.name} aria-label={g.name} className="space-y-6">
+                    <h3 className="kicker">{g.name}</h3>
+                    {g.fields.map((f) =>
+                      f.type === "PICKUP" ? (
+                        <PickupBlock
+                          key={f.key}
+                          field={f}
+                          points={form.pickup?.points ?? []}
+                          companies={form.pickup?.transportCompanies ?? []}
+                          routes={form.pickup?.trainRoutes ?? []}
+                          value={answers[f.key] as PickupAnswer | undefined}
+                          onChange={(v) => setAnswer(f.key, v)}
+                          ctx={pickupCtx}
+                          errors={Object.fromEntries(Object.entries(formErrors).filter(([k]) => k.startsWith(`${f.key}.`)).map(([k, v]) => [k.slice(f.key.length + 1), v]))}
+                        />
+                      ) : f.type === "EXTRA" ? (
+                        <div key={f.key}>
+                          {f.label ? <p className="mb-4 max-w-xl text-[0.9375rem] leading-relaxed text-ink-muted">{f.helpText ?? "Add something to your stay. Priced for your dates and party; the exact total with tax is on the next page."}</p> : null}
+                          {extrasList.length ? (
+                            <ExtrasPicker
+                              extras={extrasList}
+                              value={extras}
+                              onChange={setExtras}
+                              persons={persons}
+                              nights={effectiveKind === "dayuse" ? 1 : nights}
+                              errors={Object.fromEntries(Object.entries(formErrors).filter(([k]) => k.startsWith("extra:")).map(([k, v]) => [k.slice(6), v]))}
+                              loading={!!extrasKey && liveExtras?.key !== extrasKey}
+                            />
+                          ) : (
+                            <p className="text-sm text-ink-muted">No extras are on offer for these dates.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <FormFieldInput
+                          key={f.key}
+                          field={f}
+                          value={answers[f.key]}
+                          onChange={(v) => setAnswer(f.key, v)}
+                          error={formErrors[f.key]}
+                          required={f.required === "REQUIRED"}
+                          upload={{ slug: hotel.slug, channel: site.channel, preview, maxFileMB: form.uploads.maxFileMB }}
+                        />
+                      ),
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {stepKey === "review" && quoteRequest ? (
             <BookingReview
               hotel={hotel}
               site={site}
               request={quoteRequest}
               guest={guest}
+              setGuestEmail={(email) => {
+                setGuest((g) => ({ ...g, email }));
+                setFormErrors((e) => {
+                  const { email: _drop, ...rest } = e;
+                  void _drop;
+                  return rest;
+                });
+              }}
+              emailError={formErrors.email ?? null}
+              form={form}
+              answers={answers}
+              cond={cond}
+              stepOf={[steps.length - 1, steps.length]}
+              preview={preview}
               plan={plans.length > 1 ? plan : undefined}
               held={held}
               setHeld={setHeld}
               onQuote={setQuote}
+              onIssues={showIssues}
               onBack={(to, message) => {
                 setHeld(null);
                 setFlash(message ?? null);
-                setStep(to);
+                setStep(to === 0 ? 0 : steps.indexOf("details"));
               }}
-              onDone={() => draft.set(draftKey, { v: 2, guest, held: null } satisfies Draft)}
+              onEdit={(k) => setStep(steps.indexOf(k))}
+              onDone={() => draft.set(draftKey, { v: 3, guest, answers: {}, extras: [], held: null } satisfies Draft)}
             />
           ) : null}
 
-          {step < 2 ? (
+          {stepKey !== "review" ? (
             <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
               {step > 0 ? (
-                <button type="button" className="btn btn-outline" onClick={() => setStep((s) => s - 1)}>
+                <button type="button" className="btn btn-outline" onClick={() => setStep((s) => Math.max(0, Math.min(s, reviewIndex) - 1))}>
                   <ArrowLeft size={16} aria-hidden /> Back
                 </button>
               ) : (
@@ -362,7 +610,7 @@ export function BookingFlow({
                 </Link>
               )}
               <button type="button" className="btn btn-primary group" onClick={next} disabled={onlineOff} data-testid="booking-next">
-                Continue to {STEPS[step + 1].toLowerCase()}
+                Continue to {STEP_LABEL[steps[steps.indexOf(stepKey) + 1]].toLowerCase()}
                 <ArrowRight size={16} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
@@ -370,7 +618,7 @@ export function BookingFlow({
         </div>
       </div>
 
-      <aside aria-label="Booking summary" className={`lg:pt-2 ${step === 2 ? "max-lg:hidden" : ""}`}>
+      <aside aria-label="Booking summary" className={`lg:pt-2 ${stepKey === "review" ? "max-lg:hidden" : ""}`}>
         <div className="lg:sticky lg:top-24">
           <BookingSummary
             hotel={hotel}
@@ -383,7 +631,8 @@ export function BookingFlow({
             kids={children}
             estimate={plan?.quote ?? live?.quote ?? null}
             planName={plans.length > 1 && plan ? planTitle(plan) : null}
-            quote={step === 2 ? quote : null}
+            quote={stepKey === "review" ? quote : null}
+            addOns={{ extras: chosenExtras, extrasList, transfers, points: form.pickup?.points ?? [], persons, nights: effectiveKind === "dayuse" ? 1 : nights }}
             loading={availability.status === "loading"}
           />
         </div>
@@ -394,10 +643,12 @@ export function BookingFlow({
 
 /* ------------------------------------------------------------------ Stepper */
 
-function Stepper({ step, onStep, locked }: { step: number; onStep: (i: number) => void; locked: boolean }) {
+const NUMERALS = ["i", "ii", "iii", "iv", "v"];
+
+function Stepper({ labels, step, onStep, locked }: { labels: string[]; step: number; onStep: (i: number) => void; locked: boolean }) {
   return (
-    <ol className="grid grid-cols-3 border-b border-line" aria-label="Booking steps">
-      {STEPS.map((label, i) => {
+    <ol className={`grid border-b border-line ${labels.length === 4 ? "grid-cols-4" : "grid-cols-3"}`} aria-label="Booking steps">
+      {labels.map((label, i) => {
         const done = i < step;
         const current = i === step;
         return (
@@ -409,7 +660,7 @@ function Stepper({ step, onStep, locked }: { step: number; onStep: (i: number) =
               aria-current={current ? "step" : undefined}
               className={`flex w-full items-baseline gap-2.5 pb-3 text-left ${done && !locked ? "cursor-pointer hover:text-laterite" : "cursor-default"}`}
             >
-              <span className={`font-display text-lg italic ${current || done ? "text-laterite" : "text-ink-muted"}`}>{["i", "ii", "iii"][i]}.</span>
+              <span className={`font-display text-lg italic ${current || done ? "text-laterite" : "text-ink-muted"}`}>{NUMERALS[i]}.</span>
               <span className={`text-sm ${current ? "text-ink" : "text-ink-muted max-sm:sr-only"}`}>{label}</span>
               {done ? <Check size={13} className="text-laterite max-sm:hidden" aria-hidden /> : null}
             </button>
@@ -421,10 +672,12 @@ function Stepper({ step, onStep, locked }: { step: number; onStep: (i: number) =
   );
 }
 
-export function StepTitle({ n, children }: { n: number; children: React.ReactNode }) {
+export function StepTitle({ n, total = 3, children }: { n: number; total?: number; children: React.ReactNode }) {
   return (
     <header className="mb-8">
-      <p className="kicker">Step {WORDS[n]} of three</p>
+      <p className="kicker">
+        Step {WORDS[n]} of {WORDS[total - 1]}
+      </p>
       <h2 className="display-md mt-3 text-[clamp(2rem,4vw,3rem)]">{children}</h2>
     </header>
   );
@@ -433,6 +686,7 @@ export function StepTitle({ n, children }: { n: number; children: React.ReactNod
 /* ------------------------------------------------------------------ Step 1: the stay */
 
 function StepStay(props: {
+  total: number;
   rooms: RoomTypePublic[];
   roomId?: string;
   setRoomId: (id: string) => void;
@@ -466,7 +720,7 @@ function StepStay(props: {
   const party = props.adults + props.kids;
   return (
     <div className="space-y-12">
-      <StepTitle n={0}>
+      <StepTitle n={0} total={props.total}>
         Choose your <em className="accent">room</em>
       </StepTitle>
 
@@ -733,6 +987,8 @@ function DayUsePicker({ today, value, onChange }: { today: ISODate; value: DayUs
 /* ------------------------------------------------------------------ Step 2: guest */
 
 function StepGuest({
+  n,
+  total,
   guest,
   setGuest,
   errors,
@@ -742,7 +998,14 @@ function StepGuest({
   onSignedIn,
   onSignOut,
   devMode,
+  fields,
+  answers,
+  setAnswer,
+  emailOptional,
+  upload,
 }: {
+  n: number;
+  total: number;
   guest: GuestForm;
   setGuest: (g: GuestForm) => void;
   errors: Record<string, string | undefined>;
@@ -752,12 +1015,24 @@ function StepGuest({
   onSignedIn: (g: GuestAccount) => void;
   onSignOut: () => void;
   devMode: boolean;
+  /** The form's fields for this step, visible ones only, in order (M7). */
+  fields: FormField[];
+  answers: Answers;
+  setAnswer: (key: string, v: AnswerValue) => void;
+  /** Email is asked for only when paying online (the form's rule), unless the hotel always wants it. */
+  emailOptional: boolean;
+  upload: { slug: string; channel: string; preview: string | null; maxFileMB: number };
 }) {
-  const set = (k: keyof GuestForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setGuest({ ...guest, [k]: e.target.value });
+  const TESTID: Record<string, string> = { fullName: "guest-name", phone: "guest-phone", email: "guest-email" };
+  const HINT: Record<string, string> = {
+    fullName: "As it appears on your ID",
+    phone: "For the confirmation SMS; the hotel may call or WhatsApp you",
+    email: emailOptional ? "Needed only if you pay online, for the receipt. Pay at the hotel and you can leave it out." : "For your confirmation and receipt",
+  };
+  const groups = groupBySection(fields);
   return (
     <div>
-      <StepTitle n={1}>
+      <StepTitle n={n} total={total}>
         Who is <em className="accent">checking in?</em>
       </StepTitle>
 
@@ -796,48 +1071,42 @@ function StepGuest({
         </div>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Field label="Full name" hint="As it appears on your ID" error={errors.fullName} className="sm:col-span-2">
-          {(id, describedBy) => (
-            <input id={id} aria-describedby={describedBy} aria-invalid={!!errors.fullName} className="field" autoComplete="name" value={guest.fullName} onChange={set("fullName")} placeholder="Adaeze Okonkwo" data-testid="guest-name" />
-          )}
-        </Field>
-        <Field label="Mobile number" hint="For the confirmation SMS; the hotel may call or WhatsApp you" error={errors.phone}>
-          {(id, describedBy) => (
-            <div className="flex">
-              <span className="num inline-flex items-center rounded-l-sm border border-r-0 border-line-strong bg-surface-2 px-3 text-sm text-ink-muted">+234</span>
-              <input id={id} aria-describedby={describedBy} aria-invalid={!!errors.phone} className="field !rounded-l-none" type="tel" inputMode="tel" autoComplete="tel-national" value={guest.phone} onChange={set("phone")} placeholder="0803 123 4567" data-testid="guest-phone" />
+      <div className="space-y-10">
+        {groups.map((g, gi) => (
+          <section key={g.name} aria-label={g.name}>
+            {groups.length > 1 || gi > 0 ? <h3 className="kicker mb-5">{g.name}</h3> : null}
+            <div className="grid gap-6 sm:grid-cols-2">
+              {g.fields.map((f) => {
+                const guestKey = GUEST_KEYS.has(f.key) ? (f.key as keyof GuestForm) : null;
+                const wide = f.key === "fullName" || f.type === "LONG_TEXT" || f.type === "MULTI_SELECT" || f.type === "CHECKBOX" || f.type === "FILE" || (f.type === "SELECT" && f.options.length <= 4);
+                return (
+                  <div key={f.key} className={wide ? "sm:col-span-2" : ""}>
+                    <FormFieldInput
+                      field={f}
+                      value={guestKey ? guest[guestKey] : answers[f.key]}
+                      onChange={(v) => (guestKey ? setGuest({ ...guest, [guestKey]: typeof v === "string" ? v : "" }) : setAnswer(f.key, v))}
+                      error={errors[f.key] ?? null}
+                      required={f.key === "email" ? !emailOptional : f.key === "fullName" || f.key === "phone" || f.required === "REQUIRED"}
+                      testId={TESTID[f.key]}
+                      hintOverride={f.guestPurpose ?? f.helpText ?? HINT[f.key] ?? null}
+                      upload={upload}
+                    />
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </Field>
-        <Field label="Email" hint="For your confirmation and receipt" error={errors.email}>
-          {(id, describedBy) => (
-            <input id={id} aria-describedby={describedBy} aria-invalid={!!errors.email} className="field" type="email" autoComplete="email" inputMode="email" value={guest.email} onChange={set("email")} placeholder="you@example.com" data-testid="guest-email" />
-          )}
-        </Field>
-        <Field label="Arriving around" hint="Helps the desk have your room ready" optional>
-          {(id, describedBy) => (
-            <select id={id} aria-describedby={describedBy} className="field appearance-none" value={guest.arrival} onChange={set("arrival")}>
-              <option value="">I am not sure yet</option>
-              {["Before noon", "12:00 to 15:00", "15:00 to 18:00", "18:00 to 21:00", "After 21:00"].map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-          )}
-        </Field>
-        <Field label="Requests for the hotel" hint="Airport pickup, a quiet floor, a cot" optional className="sm:col-span-2">
-          {(id, describedBy) => (
-            <textarea id={id} aria-describedby={describedBy} className="field min-h-28 resize-y" value={guest.requests} onChange={set("requests")} maxLength={440} />
-          )}
-        </Field>
+          </section>
+        ))}
       </div>
     </div>
   );
 }
 
-/** Folds the arrival time into the free-text requests the API stores. */
-export function composeRequests(g: GuestForm) {
-  return [g.arrival ? `Arriving around ${g.arrival}.` : "", g.requests.trim()].filter(Boolean).join(" ").slice(0, 500);
+/** Folds the arrival time and requests into the free-text requests an API without M7 forms stores. */
+export function composeRequests(answers: Answers) {
+  const arrival = typeof answers.estimatedArrivalTime === "string" ? answers.estimatedArrivalTime : "";
+  const requests = typeof answers.specialRequests === "string" ? answers.specialRequests.trim() : "";
+  return [arrival ? `Arriving around ${arrival}.` : "", requests].filter(Boolean).join(" ").slice(0, 500);
 }
 
 export type { Quote };

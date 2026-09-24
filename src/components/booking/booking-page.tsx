@@ -6,15 +6,19 @@ import { APP_NAME } from "@/lib/env";
 import { hidesPlatform } from "@/lib/white-label";
 import type { HotelDetail } from "@/lib/types";
 import { BookingFlow } from "./booking-flow";
+import { api } from "@/lib/api";
+import { builtInForm, normaliseForm } from "@/lib/booking-form";
 
 /** Server wrapper shared by the marketplace (MARKETPLACE channel) and microsite (BOOKING_SITE) booking routes. */
-export function BookingPage({
+export async function BookingPage({
   hotel,
   today,
   initial,
   hotelHref,
   channel,
   confirmPath,
+  preview = null,
+  formChannel,
 }: {
   hotel: HotelDetail;
   today: ISODate;
@@ -22,7 +26,14 @@ export function BookingPage({
   hotelHref: string;
   channel: BookingChannel;
   confirmPath: string;
+  /** M7: a preview token renders the hotel's draft form (the final booking is switched off). */
+  preview?: string | null;
+  /** In a preview, the Form Builder can show the form of another channel. */
+  formChannel?: BookingChannel;
 }) {
+  // M7: the hotel's own booking form for this channel; the built-in one against an older API.
+  const raw = await api.bookingForm(hotel.slug, formChannel ?? channel, preview).catch(() => null);
+  const form = raw ? normaliseForm(raw, formChannel ?? channel) : builtInForm(channel);
   return (
     <div className="container-page pb-8 pt-8 lg:pt-10">
       <Link href={hotelHref} className="kicker inline-flex items-center gap-2 hover:text-ink">
@@ -51,6 +62,8 @@ export function BookingPage({
           site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: hidesPlatform(hotel.whiteLabel) ? null : APP_NAME }}
           today={today}
           initial={initial}
+          form={form}
+          preview={preview && form.preview ? preview : null}
         />
       </div>
     </div>

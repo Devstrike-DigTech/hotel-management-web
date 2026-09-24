@@ -28,6 +28,8 @@ import { RedeemPoints } from "../loyalty/redeem-points";
 import { formatPoints, redeemOffer } from "@/lib/loyalty";
 import type { HotelLoyalty } from "@/lib/types";
 import { StepTitle, composeRequests, type BookingHotel, type BookingSite, type GuestForm } from "./booking-flow";
+import { answersToSend, issuesFrom, type Answers, type ConditionContext, type PublicBookingForm, type ValidationIssue } from "@/lib/booking-form";
+import { ReviewAnswers } from "./review-answers";
 import { HoldCountdown, useRemaining } from "./hold-countdown";
 
 export interface Held {
@@ -56,17 +58,38 @@ export function BookingReview({
   site,
   request,
   guest,
+  setGuestEmail,
+  emailError,
+  form,
+  answers,
+  cond,
+  stepOf,
+  preview,
   plan,
   held,
   setHeld,
   onQuote,
   onBack,
+  onIssues,
+  onEdit,
   onDone,
 }: {
   hotel: BookingHotel;
   site: BookingSite;
   request: QuoteRequest;
   guest: GuestForm;
+  /** M7: email is asked for here when the guest chooses to pay online without having given one. */
+  setGuestEmail: (email: string) => void;
+  emailError: string | null;
+  form: PublicBookingForm;
+  answers: Answers;
+  cond: ConditionContext;
+  /** This step's number and the number of steps. */
+  stepOf: [number, number];
+  preview: string | null;
+  /** Server validation problems that belong to an earlier step. */
+  onIssues: (issues: ValidationIssue[], message?: string) => void;
+  onEdit: (step: "details" | "addons") => void;
   /** The chosen rate plan when the room has more than one. */
   plan?: PlanOffer;
   held: Held | null;
@@ -80,12 +103,19 @@ export function BookingReview({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [mode, setMode] = useState<PaymentMode | null>(null);
   const [consent, setConsent] = useState(false);
+  const [emailProblem, setEmailProblem] = useState<string | null>(emailError);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email.trim());
+  const emailNeeded = (m: PaymentMode | null) => !!m && (form.rules.emailRequiredFor.includes(m) || form.fields.find((f) => f.key === "email")?.required === "REQUIRED");
   const [consentError, setConsentError] = useState(false);
   const [busy, setBusy] = useState<null | "quote" | "book" | "pay" | "release">(null);
   const [error, setError] = useState<string | null>(null);
   const [priceNote, setPriceNote] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const bookKey = useRef<string | null>(null);
+  const issuesRef = useRef(onIssues);
+  useEffect(() => {
+    issuesRef.current = onIssues;
+  }, [onIssues]);
   const requestKey = JSON.stringify(request);
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [promoBusy, setPromoBusy] = useState(false);
@@ -163,6 +193,8 @@ export function BookingReview({
         if (e instanceof ClientApiError && e.code === "ROOM_UNAVAILABLE") onBack(0, "That room type has just been taken for your dates. Here is what is still free.");
         else if (e instanceof ClientApiError && (e.code === "STAY_RESTRICTED" || e.code === "RATE_PLAN_UNAVAILABLE")) onBack(0, restrictionMessage(e));
         else if (e instanceof ClientApiError && e.code === "CAPACITY_EXCEEDED") onBack(0, "That room is too small for your group. Choose a larger room or fewer guests.");
+        else if (e instanceof ClientApiError && e.code === "VALIDATION_ERROR" && issuesFrom(e.details).some((i) => /^(extras|transfers)\[/.test(i.path)))
+          issuesRef.current(issuesFrom(e.details), "Some of what you added could not be priced for these dates. The reasons are beside each one.");
         else setQuoteError(humanError(e, "We could not price your stay just now."));
         return null;
       } finally {
@@ -252,7 +284,12 @@ export function BookingReview({
   const quoteStale = quoteLeft !== null && quoteLeft <= 0;
 
   async function book() {
-    if (!quote || !mode) return;
+    if (!quote || !mode || preview) return;
+    if (emailNeeded(mode) && !emailOk) {
+      setEmailProblem(guest.email.trim() ? "Enter an email address like you@example.com." : "Paying online needs an email address for the Paystack receipt.");
+      document.getElementById("review-email")?.focus();
+      return;
+    }
     if (!consent) {
       setConsentError(true);
       return;
@@ -277,7 +314,8 @@ export function BookingReview({
           quoteToken: q.quoteToken,
           paymentMode: mode,
           guest: { fullName: guest.fullName.trim(), phone: `+${toE164Digits(guest.phone)}`, email: guest.email.trim() || undefined },
-          specialRequests: composeRequests(guest) || undefined,
+          // M7: the hotel's form answers; an API without forms gets the M3 free-text requests instead.
+          ...(form.builtIn ? { specialRequests: composeRequests(answers) || undefined } : { answers: answersToSend(form, answers, cond) }),
           consent: true,
           callbackUrl: mode === "ONLINE" ? callbackUrl(site, hotel.slug) : undefined,
         },
@@ -312,8 +350,13 @@ export function BookingReview({
         case "PAYMENT_PROVIDER_ERROR":
           return setError("Paystack is not answering right now, so the room was not held. Try again in a minute, or choose to pay at the hotel.");
         case "VALIDATION_ERROR": {
+          const issues = issuesFrom(e.details);
+          const email = issues.find((i) => i.path === "guest.email");
+          if (email) setEmailProblem(email.message);
+          const elsewhere = issues.filter((i) => i.path !== "guest.email" && /^(answers\.|guest\.|extras\[|transfers\[)/.test(i.path));
+          if (elsewhere.length) return onIssues(elsewhere);
+          if (email) return;
           const f = e.fields;
-          if (f["guest.phone"] || f["guest.fullName"] || f["guest.email"] || f.guest) return onBack(1, "Please check your details: " + Object.values(f).flat().join(" "));
           return setError(Object.values(f).flat().join(" ") || e.message);
         }
         default:
@@ -395,7 +438,7 @@ export function BookingReview({
 
   return (
     <div>
-      <StepTitle n={2}>
+      <StepTitle n={stepOf[0]} total={stepOf[1]}>
         {held ? (
           <>
             Your room is <em className="accent">held.</em>
@@ -470,11 +513,11 @@ export function BookingReview({
         {[
           ["Guest", guest.fullName],
           ["Mobile", guest.phone ? formatPhone(guest.phone) : ""],
-          ["Email", guest.email],
+          ["Email", guest.email || "Not given"],
         ].map(([k, v]) => (
           <div key={k} className="min-w-0 bg-paper px-4 py-3">
             <dt className="kicker !text-[10px]">{k}</dt>
-            <dd className="mt-1 truncate text-[0.9375rem]">{v}</dd>
+            <dd className={`mt-1 truncate text-[0.9375rem] ${v === "Not given" ? "text-ink-muted" : ""}`}>{v}</dd>
           </div>
         ))}
         {!held ? (
@@ -485,6 +528,8 @@ export function BookingReview({
           <span className="bg-paper" />
         )}
       </dl>
+
+      <ReviewAnswers form={form} answers={answers} cond={cond} quote={quote} onEdit={held ? undefined : onEdit} />
 
       {priceNote ? (
         <div className="mt-6">
@@ -611,6 +656,33 @@ export function BookingReview({
             </div>
           </fieldset>
 
+          {emailNeeded(mode) && (!emailOk || emailProblem) ? (
+            <div className="mt-6 max-w-md rounded-sm border border-line-strong bg-surface p-4" data-testid="review-email-box">
+              <label htmlFor="review-email" className="mb-2 block text-sm font-medium">
+                Email for your receipt
+              </label>
+              <input
+                id="review-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                className="field"
+                value={guest.email}
+                onChange={(e) => {
+                  setGuestEmail(e.target.value);
+                  setEmailProblem(null);
+                }}
+                aria-invalid={!!emailProblem || undefined}
+                aria-describedby="review-email-hint"
+                placeholder="you@example.com"
+                data-testid="review-email"
+              />
+              <p id="review-email-hint" className={`mt-1.5 text-xs ${emailProblem ? "text-danger" : "text-ink-muted"}`} role={emailProblem ? "alert" : undefined}>
+                {emailProblem ?? "Paystack sends the receipt here. Paying at the hotel instead? Then you can leave it out."}
+              </p>
+            </div>
+          ) : null}
+
           <label className={`mt-8 flex cursor-pointer items-start gap-3 text-sm leading-relaxed ${consentError && !consent ? "text-danger" : "text-ink-muted"}`}>
             <input
               type="checkbox"
@@ -638,7 +710,7 @@ export function BookingReview({
             <button type="button" className="btn btn-outline" onClick={() => onBack(1)}>
               <ArrowLeft size={16} aria-hidden /> Back
             </button>
-            <button type="button" className="btn btn-primary group" onClick={book} disabled={!quote || !mode || !!busy} data-testid="book-submit">
+            <button type="button" className="btn btn-primary group" onClick={book} disabled={!quote || !mode || !!busy || !!preview} title={preview ? "Bookings are switched off in a draft preview" : undefined} data-testid="book-submit">
               {busy === "book" || busy === "quote"
                 ? mode === "ONLINE"
                   ? "Holding your room"
@@ -726,6 +798,13 @@ function PriceLedger({ quote, planName, loading }: { quote: Quote; planName: str
             <dd className="whitespace-nowrap">&minus;{formatNaira(pointsKobo)}</dd>
           </div>
         ) : null}
+        {(b.addOns ?? []).map((x) => (
+          <div key={`${x.kind}-${x.refId}`} className="flex items-baseline gap-3" data-testid="addon-line">
+            <dt className="min-w-0 font-sans [font-variant-numeric:normal]">{x.description}</dt>
+            <span aria-hidden className="leader" />
+            <dd>{formatNaira(x.netKobo)}</dd>
+          </div>
+        ))}
         {b.taxes.map((t) => (
           <div key={t.code} className="flex items-baseline gap-3 text-ink-muted">
             <dt className="font-sans [font-variant-numeric:normal]">

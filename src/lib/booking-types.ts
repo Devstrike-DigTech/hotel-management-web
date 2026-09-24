@@ -54,6 +54,11 @@ export interface PriceBreakdown {
   discountLines?: { date: string; description: string; amountKobo: number }[];
   /* M5: the part of discountKobo that came from loyalty points. */
   loyaltyDiscountKobo?: number;
+  /* M7: paid extras and transfers. With add-ons, totalKobo and taxes include them; roomTotalKobo is the room part. */
+  roomTotalKobo?: number;
+  addOns?: { kind: "EXTRA" | "TRANSFER"; refId: string; description: string; amountKobo: number; netKobo: number; taxKobo: number; totalKobo: number }[];
+  addOnsSubtotalKobo?: number;
+  addOnsTaxKobo?: number;
 }
 
 /** M5: loyalty on a quote (null when the hotel has no programme). */
@@ -121,6 +126,8 @@ export interface HotelMini {
   coverImageUrl: string | null;
   branding: Branding;
   mapUrl: string;
+  /* M7 (trip view, review request): the hotel's theme, so its pages on the hotel host look like its site. */
+  theme?: Record<string, unknown> | null;
 }
 
 export interface BookingConfig {
@@ -256,6 +263,27 @@ export interface Quote {
   promo?: { code: string; description?: string | null; discountKobo: number } | null;
   /* M5 */
   loyalty?: QuoteLoyalty | null;
+  /* M7 */
+  formVersionId?: string;
+  extras?: import("./booking-form").QuotedExtra[];
+  transfers?: import("./booking-form").QuotedTransfer[];
+}
+
+/** M7: a transfer on the guest's trip view (API-M7 8.4). The driver appears from DRIVER_ASSIGNED on. */
+export interface BookingTransfer {
+  id: string;
+  direction: "ARRIVAL" | "DEPARTURE";
+  status: "REQUESTED" | "CONFIRMED" | "DRIVER_ASSIGNED" | "EN_ROUTE" | "PICKED_UP" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+  pickupPointName: string;
+  kind: import("./theme/types").PickupKind;
+  scheduledAt: string;
+  passengers: number;
+  vehicleName: string;
+  totalKobo: number;
+  detailsSummary: string;
+  notesForGuest: string | null;
+  driver: { name: string; phone: string; vehiclePlate: string; vehicleDescription: string | null } | null;
+  delayNote: string | null;
 }
 
 export interface PaymentInit {
@@ -319,6 +347,10 @@ export interface BookingView {
   promo?: { code: string; discountKobo: number } | null;
   /* M5 */
   loyalty?: BookingLoyalty | null;
+  /* M7 */
+  answers?: import("./booking-form").AnswerView[];
+  extras?: (import("./booking-form").QuotedExtra & { status: "ACTIVE" | "CANCELLED" })[];
+  transfers?: BookingTransfer[];
 }
 
 export interface BookingCreated {

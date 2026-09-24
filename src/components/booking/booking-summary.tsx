@@ -7,6 +7,19 @@ import type { RoomTypePublic } from "@/lib/types";
 import type { Range } from "../search/range-calendar";
 import { Plate } from "../ui/plate";
 import type { BookingHotel, DayUse, StayKind } from "./booking-flow";
+import { estimateExtra, type ExtraSelection, type PublicExtra, type TransferSelection } from "@/lib/booking-form";
+import { transferPrice } from "@/lib/pickup";
+import type { PickupPoint } from "@/lib/theme/types";
+
+/** M7: extras and transfers chosen so far, for the running total before the quote prices them. */
+export interface SummaryAddOns {
+  extras: ExtraSelection[];
+  extrasList: PublicExtra[];
+  transfers: TransferSelection[];
+  points: PickupPoint[];
+  persons: number;
+  nights: number;
+}
 
 /** The booking summary in the side column: hotel, stay, and the price as it firms up. */
 export function BookingSummary({
@@ -22,6 +35,7 @@ export function BookingSummary({
   quote,
   loading,
   planName,
+  addOns,
 }: {
   hotel: BookingHotel;
   room?: RoomTypePublic;
@@ -35,8 +49,24 @@ export function BookingSummary({
   quote: Quote | null;
   loading: boolean;
   planName?: string | null;
+  addOns?: SummaryAddOns;
 }) {
   const price = quote?.breakdown ?? estimate;
+  // Before the quote: the add-ons at their entered prices (tax comes with the quote).
+  const pending = !quote && addOns
+    ? [
+        ...addOns.extras.flatMap((s) => {
+          const e = addOns.extrasList.find((x) => x.id === s.extraId);
+          return e ? [{ key: `e-${e.id}`, label: e.name, amount: e.price && !s.quantity ? e.price.amountKobo : estimateExtra(e, s.quantity ?? 0, addOns.nights, addOns.persons) }] : [];
+        }),
+        ...addOns.transfers.flatMap((t) => {
+          const p = addOns.points.find((x) => x.id === t.pickupPointId);
+          const v = p?.vehicleOptions.find((o) => o.id === t.vehicleOptionId) ?? null;
+          return p ? [{ key: `t-${t.direction}`, label: t.direction === "ARRIVAL" ? `Pickup, ${p.shortName ?? p.name}` : `Drop-off, ${p.shortName ?? p.name}`, amount: transferPrice(p, t.direction, v) }] : [];
+        }),
+      ]
+    : [];
+  const pendingTotal = pending.reduce((n, x) => n + x.amount, 0);
   return (
     <div className="overflow-hidden rounded-md border border-line-strong bg-surface">
       <div className="flex gap-4 border-b border-line p-4">
@@ -80,6 +110,18 @@ export function BookingSummary({
                 <dd>&minus;{formatNaira(price.discountKobo)}</dd>
               </div>
             ) : null}
+            {(quote?.breakdown.addOns ?? []).map((x) => (
+              <div key={`${x.kind}-${x.refId}`} className="flex justify-between gap-4" data-testid="summary-addon">
+                <dt className="min-w-0 truncate font-sans text-ink-muted [font-variant-numeric:normal]">{x.description}</dt>
+                <dd>{formatNaira(x.netKobo)}</dd>
+              </div>
+            ))}
+            {pending.map((x) => (
+              <div key={x.key} className="flex justify-between gap-4" data-testid="summary-addon">
+                <dt className="min-w-0 truncate font-sans text-ink-muted [font-variant-numeric:normal]">{x.label}</dt>
+                <dd>{formatNaira(x.amount)}</dd>
+              </div>
+            ))}
             {price.taxes.filter((t) => !t.inclusive).map((t) => (
               <div key={t.code} className="flex justify-between gap-4">
                 <dt className="font-sans text-ink-muted [font-variant-numeric:normal]">{t.label}</dt>
@@ -87,8 +129,8 @@ export function BookingSummary({
               </div>
             ))}
             <div className="flex items-baseline justify-between gap-4 border-t border-line pt-3">
-              <dt className="font-sans text-sm font-medium">{quote ? "Total" : "Total, estimated"}</dt>
-              <dd className="text-2xl font-medium">{formatNaira(price.totalKobo)}</dd>
+              <dt className="font-sans text-sm font-medium">{quote ? "Total" : pending.length ? "Total, estimated before tax on extras" : "Total, estimated"}</dt>
+              <dd className="text-2xl font-medium" data-testid="summary-total">{formatNaira(price.totalKobo + pendingTotal)}</dd>
             </div>
           </dl>
         ) : (
