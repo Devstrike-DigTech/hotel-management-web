@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { addDays, API, bookRoom, checkInAndOut, e164, futureStay, lagosToday, newGuest, randomIp, signInWithOtp, staffToken } from "./helpers";
+import { addDays, API, bookRoom, checkInAndOut, e164, futureStay, lagosToday, newGuest, randomIp, signInWithOtp, staffToken, fillRequiredAnswers, passAddOnsStep } from "./helpers";
 
 /**
  * M5 on the guest side: a hotel group's site, loyalty points at booking and after check-out, and
@@ -101,7 +101,9 @@ test.describe("loyalty", () => {
     await page.getByTestId("guest-name").fill(guest.name);
     await page.getByTestId("guest-phone").fill(guest.phone);
     await page.getByTestId("guest-email").fill(guest.email);
+    await fillRequiredAnswers(page);
     await page.getByTestId("booking-next").click();
+    await passAddOnsStep(page);
 
     const total = page.getByTestId("quote-total");
     await expect(total).toBeVisible();

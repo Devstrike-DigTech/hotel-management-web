@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "perf:essentials": "node scripts/perf-budget.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

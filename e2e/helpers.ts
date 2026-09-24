@@ -81,8 +81,11 @@ export async function bookRoom(
   await page.getByTestId("guest-name").fill(opts.guest.name);
   await page.getByTestId("guest-phone").fill(opts.guest.phone);
   await page.getByTestId("guest-email").fill(opts.guest.email);
+  await fillRequiredAnswers(page);
   await page.getByTestId("booking-next").click();
-  // Step three: the authoritative quote, then pay.
+  // M7: a hotel whose form has extras or a pickup shows them on a step of their own; skip it.
+  await passAddOnsStep(page);
+  // The last step: the authoritative quote, then pay.
   await expect(page.getByTestId("quote-total")).toBeVisible();
   if (opts.promo) {
     await page.getByTestId("promo-open").click();
@@ -93,6 +96,43 @@ export async function bookRoom(
   await page.getByTestId(`pay-${opts.pay}`).click();
   await page.getByTestId("consent").check();
   await page.getByTestId("book-submit").click();
+}
+
+/**
+ * M7: fills any required question the hotel added to its booking form (a select, a text box, a
+ * yes/no), so the booking tests work whatever form the seed publishes.
+ */
+export async function fillRequiredAnswers(page: Page) {
+  const required = page.locator('[aria-required="true"]:not([data-testid^="guest-"])');
+  for (const el of await required.all()) {
+    if (!(await el.isVisible())) continue;
+    const tag = await el.evaluate((n) => n.tagName.toLowerCase());
+    const type = (await el.getAttribute("type")) ?? "";
+    if (tag === "select") {
+      const value = await el.evaluate((n) => [...(n as HTMLSelectElement).options].find((o) => o.value)?.value ?? "");
+      await el.selectOption(value);
+    } else if (type === "checkbox") await el.check();
+    else if (type === "date") await el.fill(addDays(lagosToday(), -9000));
+    else if (type === "time") await el.fill("14:00");
+    else if (type === "number") await el.fill("1");
+    else if (!(await el.inputValue())) await el.fill("Test answer");
+  }
+  for (const group of await page.locator('[role="radiogroup"][data-testid^="field-"]').all()) {
+    if (!(await group.isVisible())) continue;
+    const checked = await group.locator("input:checked").count();
+    if (!checked) await group.locator("label").first().click();
+  }
+}
+
+/** Continues past the extras and getting-here step when the form has one. */
+export async function passAddOnsStep(page: Page) {
+  const addons = page.getByTestId("step-addons");
+  const quote = page.getByTestId("quote-total");
+  await expect(addons.or(quote).first()).toBeVisible();
+  if (await addons.isVisible()) {
+    await fillRequiredAnswers(page);
+    await page.getByTestId("booking-next").click();
+  }
 }
 
 /** Newest dev-outbox message to a recipient (the backend's non-production mail/SMS capture). */

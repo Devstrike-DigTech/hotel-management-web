@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addDays, bookRoom, futureStay, lagosToday, newGuest, randomIp } from "./helpers";
+import { addDays, bookRoom, futureStay, lagosToday, newGuest, randomIp, fillRequiredAnswers, passAddOnsStep } from "./helpers";
 
 /**
  * M4 on the guest side, against the seeded Palmwine House (API-M4.md section 10): rate plans
@@ -42,7 +42,9 @@ test("book with a promo code: the saving is shown and is what is charged", async
   await page.getByTestId("guest-name").fill(guest.name);
   await page.getByTestId("guest-phone").fill(guest.phone);
   await page.getByTestId("guest-email").fill(guest.email);
+  await fillRequiredAnswers(page);
   await page.getByTestId("booking-next").click();
+  await passAddOnsStep(page);
   const before = naira(await page.getByTestId("quote-total").innerText());
   await page.getByTestId("promo-open").click();
   await page.getByTestId("promo-input").fill("EASTER15");
@@ -110,7 +112,9 @@ test("the review step states the non-refundable terms and offers no pay-at-hotel
   await page.getByTestId("guest-name").fill(guest.name);
   await page.getByTestId("guest-phone").fill(guest.phone);
   await page.getByTestId("guest-email").fill(guest.email);
+  await fillRequiredAnswers(page);
   await page.getByTestId("booking-next").click();
+  await passAddOnsStep(page);
   await expect(page.getByTestId("quote-total")).toBeVisible();
   await expect(page.getByTestId("policy-line")).toHaveAttribute("data-policy", "non-refundable");
   await expect(page.getByTestId("policy-line")).toContainText("nothing is refunded");
@@ -142,7 +146,9 @@ test("a stay into Detty December is priced night by night, with the correct tota
   await page.getByTestId("guest-name").fill(guest.name);
   await page.getByTestId("guest-phone").fill(guest.phone);
   await page.getByTestId("guest-email").fill(guest.email);
+  await fillRequiredAnswers(page);
   await page.getByTestId("booking-next").click();
+  await passAddOnsStep(page);
 
   // Nights differ, so the ledger lists each one, with its season.
   const nights = page.getByTestId("night-line");
