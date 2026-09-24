@@ -110,6 +110,32 @@ export interface ResolvedHost {
   kind?: "PROPERTY" | "GROUP";
   groupSlug?: string;
   canonicalHost?: string;
+  /** M6: true when the host is a verified custom domain of a white-labelled hotel. */
+  whiteLabel?: boolean;
+}
+
+/** M6: one of the curated Google fonts a white-labelled hotel can choose. */
+export interface FontChoice {
+  family: string;
+  category: "serif" | "sans" | "display";
+  weights: number[];
+  googleFontsUrl: string;
+}
+
+/**
+ * M6: `HotelDetail.whiteLabel`, present only when white-label is active and the request came in
+ * on the property's verified custom domain (`?host=`). Null everywhere else.
+ */
+export interface PublicWhiteLabel {
+  brandName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  headingFont: FontChoice | null;
+  bodyFont: FontChoice | null;
+  footerLinks: { label: string; url: string }[];
+  hidePoweredBy: boolean;
 }
 
 export interface ImageRef {
@@ -152,6 +178,8 @@ export interface HotelDetail extends HotelCard {
   /* M5 */
   canonicalUrl?: string;
   whatsapp?: HotelWhatsApp;
+  /* M6 */
+  whiteLabel?: PublicWhiteLabel | null;
 }
 
 export interface Paginated<T> {

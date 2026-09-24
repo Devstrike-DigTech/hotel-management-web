@@ -4,6 +4,7 @@ import { ArrowRight, Briefcase, CheckCircle, Eye, EyeSlash, Heart, User, Users, 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSiteLinks } from "../site/site-links";
 import type { PublicReview, ReviewRequest, TravellerType } from "@/lib/booking-types";
 import { call, ClientApiError, humanError, newKey } from "@/lib/client-api";
 import { formatShort } from "@/lib/dates";
@@ -27,6 +28,7 @@ type Scores = Record<"overall" | SubscoreKey, number>;
 
 export function ReviewForm() {
   const token = useSearchParams().get("t");
+  const site = useSiteLinks();
   const [req, setReq] = useState<ReviewRequest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(token ? null : "This review link is incomplete.");
   const [scores, setScores] = useState<Scores>({ overall: 0, cleanliness: 0, service: 0, location: 0, value: 0 });
@@ -92,8 +94,8 @@ export function ReviewForm() {
         <p className="kicker">Review</p>
         <h1 className="display-md mt-3 text-4xl">That link did not work</h1>
         <p className="mt-4 text-ink-muted">{loadError}</p>
-        <Link href="/trips" className="btn btn-outline mt-8">
-          Go to your trips
+        <Link href={site.whiteLabel ? site.home : "/trips"} className="btn btn-outline mt-8">
+          {site.whiteLabel ? "Back to the hotel" : "Go to your trips"}
         </Link>
       </div>
     );
@@ -106,7 +108,7 @@ export function ReviewForm() {
       </div>
     );
 
-  const hotelHref = `/stays/${req.hotel.slug}`;
+  const hotelHref = site.whiteLabel ? site.home.replace(/\/$/, "") : `/stays/${req.hotel.slug}`;
 
   if (done)
     return (

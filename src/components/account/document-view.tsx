@@ -4,6 +4,7 @@ import { ArrowLeft, Printer } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useSiteLinks } from "../site/site-links";
 import { call, humanError } from "@/lib/client-api";
 import { formatLong } from "@/lib/dates";
 import { formatNaira, formatPhone } from "@/lib/format";
@@ -17,7 +18,7 @@ interface Header {
   state: string;
   phone: string;
   email: string;
-  appName: string;
+  appName: string | null;
 }
 interface Invoice {
   number: string;
@@ -51,6 +52,7 @@ const METHOD: Record<string, string> = { CARD_ONLINE: "Card, online", CASH: "Cas
 /** An invoice or receipt set as a printable page; the print button gives a PDF on most phones. */
 export function DocumentView({ code, kind, id }: { code: string; kind: "invoice" | "receipt"; id: string }) {
   const token = useSearchParams().get("t") ?? "";
+  const site = useSiteLinks();
   const [doc, setDoc] = useState<Doc | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +62,7 @@ export function DocumentView({ code, kind, id }: { code: string; kind: "invoice"
       .catch((e) => setError(humanError(e, "This document could not be loaded.")));
   }, [code, kind, id, token]);
 
-  const back = `/trips/${encodeURIComponent(code)}?t=${encodeURIComponent(token)}`;
+  const back = `${site.base}/trips/${encodeURIComponent(code)}?t=${encodeURIComponent(token)}`;
   return (
     <div className="container-page max-w-3xl pb-10 pt-8 print:max-w-none print:p-0">
       <div className="mb-6 flex items-center justify-between print:hidden">
@@ -78,7 +80,8 @@ export function DocumentView({ code, kind, id }: { code: string; kind: "invoice"
           <DocHeader hotel={doc.document.hotel} title={doc.type === "RECEIPT" ? "Receipt" : doc.document.kind === "PROFORMA" ? "Pro-forma invoice" : "Invoice"} number={doc.document.number} issuedAt={doc.document.issuedAt} />
           {doc.type === "INVOICE" ? <InvoiceBody d={doc.document} /> : <ReceiptBody d={doc.document} />}
           <p className="mt-10 border-t border-line pt-4 text-xs text-ink-muted">
-            Issued by {doc.document.hotel.name} through {doc.document.hotel.appName}. Amounts in Nigerian naira.
+            Issued by {doc.document.hotel.name}
+            {site.whiteLabel || !doc.document.hotel.appName ? "" : ` through ${doc.document.hotel.appName}`}. Amounts in Nigerian naira.
           </p>
         </article>
       ) : null}

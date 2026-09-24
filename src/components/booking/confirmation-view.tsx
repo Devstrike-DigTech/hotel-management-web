@@ -4,6 +4,7 @@ import { ArrowRight, BellRinging, ChatCircleText, EnvelopeSimple, PencilSimpleLi
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSiteLinks } from "../site/site-links";
 import type { BookingView, PaymentInit, PaymentStatusView } from "@/lib/booking-types";
 import { call, ClientApiError, getClockSkew, humanError, newKey } from "@/lib/client-api";
 import { formatFullDay } from "@/lib/dates";
@@ -118,12 +119,13 @@ export function ConfirmationView({
   hotelHref,
   marketplace = "",
 }: {
-  appName: string;
+  appName: string | null;
   hotelHref?: string;
   /** Origin of the marketplace for trips links; "" when this page is itself on the marketplace. */
   marketplace?: string;
 }) {
   const params = useSearchParams();
+  const site = useSiteLinks();
   const router = useRouter();
   const online = useOnline();
   const reference = params.get("reference") ?? params.get("trxref");
@@ -241,9 +243,15 @@ export function ConfirmationView({
         <p className="kicker">Booking</p>
         <h1 className="display-md mt-3 text-4xl">{view.message}</h1>
         <p className="mt-4 text-ink-muted">If you paid, your money is safe: the confirmation is also on its way by SMS and email.</p>
-        <Link href={`${marketplace}/trips`} className="btn btn-outline mt-8">
-          Go to your trips
-        </Link>
+        {site.whiteLabel ? (
+          <Link href={site.home} className="btn btn-outline mt-8">
+            Back to the hotel
+          </Link>
+        ) : (
+          <Link href={`${marketplace}/trips`} className="btn btn-outline mt-8">
+            Go to your trips
+          </Link>
+        )}
       </div>
     );
   }
@@ -296,7 +304,12 @@ export function ConfirmationView({
   }
 
   const b = view.booking;
-  const manage = marketplace ? `${marketplace}${localManage(view.manageUrl)}` : localManage(view.manageUrl);
+  // A white-labelled hotel keeps the guest on its own domain; otherwise trips live on the marketplace.
+  const manage = site.whiteLabel
+    ? `${site.base}${localManage(view.manageUrl)}`
+    : marketplace
+      ? `${marketplace}${localManage(view.manageUrl)}`
+      : localManage(view.manageUrl);
   const data = toConfirmation(b, manage);
   const first = b.guest.fullName.trim().split(/\s+/)[0];
   const awaiting = b.displayStatus === "AWAITING_PAYMENT";
@@ -370,9 +383,11 @@ export function ConfirmationView({
             <Link href={manage} className="btn btn-ink">
               <PencilSimpleLine size={17} aria-hidden /> Manage or cancel
             </Link>
-            <Link href={`${marketplace}/trips`} className="btn btn-outline">
-              All your trips <ArrowRight size={15} aria-hidden />
-            </Link>
+            {site.whiteLabel ? null : (
+              <Link href={`${marketplace}/trips`} className="btn btn-outline">
+                All your trips <ArrowRight size={15} aria-hidden />
+              </Link>
+            )}
           </div>
         </section>
       ) : null}

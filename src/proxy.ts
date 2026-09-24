@@ -14,7 +14,9 @@ import { clientIpFrom, stripTrustedHeaders, trustedProxyHeaders } from "./lib/se
  *   /api/*, /pay/mock, /dev/* on any host         -> served as is (API gateway and dev tools)
  *
  * The microsite layout reads `x-site-base` to build its own links: "" on a hotel host,
- * "/h/{slug}" on the path fallback. Client copies of the trusted-proxy headers (X-Client-IP,
+ * "/h/{slug}" on the path fallback. On a custom domain (not a subdomain of APP_DOMAIN) the proxy
+ * also sets `x-site-host`, which the layout passes to the API so a white-labelled hotel's brand is
+ * returned (M6). The developer docs (/developers) exist on the marketplace host only. Client copies of the trusted-proxy headers (X-Client-IP,
  * X-Proxy-Auth) are dropped on every route; only the server adds them, on its way to the backend.
  */
 
@@ -29,6 +31,8 @@ const RESERVED = new Set(["www", "app", "admin", "api", "docs", "mail", "static"
 
 /** Routes every host serves as is: the API gateway, and the dev-only mock checkout and mailbox. */
 const SHARED = /^\/(api\/|pay\/mock(\/|$)|dev\/)/;
+/** The developer docs: marketplace host only. */
+const DOCS = /^\/developers(\/|$)/;
 
 /** What a host serves: one property, or (M5) a hotel group's root with its properties' slugs. */
 type Site = { kind: "PROPERTY"; slug: string } | { kind: "GROUP"; slug: string; groupSlug: string; properties: string[] };
@@ -105,11 +109,20 @@ async function resolveSite(host: string, clientIp: string | null): Promise<Site 
   return sub ? { kind: "PROPERTY", slug: sub } : null;
 }
 
-function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string) {
+/** Headers only this proxy may set; a client's own copies are always dropped. */
+const SITE_HEADERS = ["x-site-base", "x-site-slug", "x-site-group", "x-site-host"];
+
+function setSiteHost(headers: Headers, customHost: string | null) {
+  if (customHost) headers.set("x-site-host", customHost);
+  else headers.delete("x-site-host");
+}
+
+function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string, customHost: string | null = null) {
   const url = req.nextUrl.clone();
   url.pathname = `/h/${slug}${rest === "/" ? "" : rest}`;
   const headers = new Headers(req.headers);
   stripTrustedHeaders(headers);
+  setSiteHost(headers, customHost);
   headers.set("x-site-base", base);
   headers.set("x-site-slug", slug);
   // The group root this property is being shown under ("" when it has a host of its own).
@@ -119,11 +132,12 @@ function rewriteToSite(req: NextRequest, slug: string, base: string, rest: strin
 }
 
 /** A hotel group's root (the list of its hotels), its sitemap, robots and card. */
-function rewriteToGroup(req: NextRequest, group: string, base: string, rest: string) {
+function rewriteToGroup(req: NextRequest, group: string, base: string, rest: string, customHost: string | null = null) {
   const url = req.nextUrl.clone();
   url.pathname = `/g/${group}${rest === "/" ? "" : rest}`;
   const headers = new Headers(req.headers);
   stripTrustedHeaders(headers);
+  setSiteHost(headers, customHost);
   headers.set("x-site-base", base);
   headers.delete("x-site-slug");
   headers.delete("x-site-group");
@@ -146,11 +160,9 @@ export async function proxy(req: NextRequest) {
     if (m) return rewriteToSite(req, m[1], `/h/${m[1]}`, m[2] ?? "/");
     const g = /^\/g\/([a-z0-9-]+)(\/.*)?$/.exec(pathname);
     if (g) return rewriteToGroup(req, g[1], `/g/${g[1]}`, g[2] ?? "/");
-    // Never trust an incoming base header on marketplace routes.
+    // Never trust an incoming site header on marketplace routes.
     const headers = new Headers(req.headers);
-    headers.delete("x-site-base");
-    headers.delete("x-site-slug");
-    headers.delete("x-site-group");
+    for (const h of SITE_HEADERS) headers.delete(h);
     stripTrustedHeaders(headers);
     return NextResponse.next({ request: { headers } });
   }
@@ -158,11 +170,21 @@ export async function proxy(req: NextRequest) {
   // Shared, host-agnostic routes: the same-origin API gateway and the dev-only payment and mail tools.
   if (SHARED.test(pathname)) {
     const headers = new Headers(req.headers);
+    for (const h of SITE_HEADERS) headers.delete(h);
     stripTrustedHeaders(headers);
     return NextResponse.next({ request: { headers } });
   }
 
+  // The developer docs are the platform's, never a hotel's (and never on a white-labelled domain).
+  if (DOCS.test(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/h/__unknown-host";
+    return NextResponse.rewrite(url, { status: 404 });
+  }
+
   const site = await resolveSite(host, clientIpFrom(req.headers));
+  // A custom domain (not {slug}.APP_DOMAIN or {slug}.localhost): the API decides whether it is white-labelled.
+  const customHost = site && !subdomainOf(host) ? host : null;
   if (!site) {
     const url = req.nextUrl.clone();
     url.pathname = "/h/__unknown-host";
@@ -173,10 +195,10 @@ export async function proxy(req: NextRequest) {
     const { groupSlug } = site;
     // The group's own files, including its card at the path Next's metadata gives it.
     const own = pathname.startsWith(`/g/${groupSlug}/`) ? pathname.slice(`/g/${groupSlug}`.length) : pathname;
-    if (own === "/" || own === "/robots.txt" || own === "/sitemap.xml" || own === "/og.png") return rewriteToGroup(req, groupSlug, "", own);
+    if (own === "/" || own === "/robots.txt" || own === "/sitemap.xml" || own === "/og.png") return rewriteToGroup(req, groupSlug, "", own, customHost);
     // "/{property slug}/..." is that hotel's microsite, under the group's host.
     const [first, rest] = firstSegment(pathname);
-    if (site.properties.includes(first)) return rewriteToSite(req, first, `/${first}`, rest, "");
+    if (site.properties.includes(first)) return rewriteToSite(req, first, `/${first}`, rest, "", customHost);
     // Anything else is an older link to the group's first hotel ("/book", a Paystack return): send it there.
     const url = req.nextUrl.clone();
     url.pathname = `/${site.slug}${pathname}`;
@@ -186,7 +208,7 @@ export async function proxy(req: NextRequest) {
   // Everything, including /robots.txt, /sitemap.xml and /og.png, is served by the hotel's own routes.
   // Its own fallback path (/h/{slug}/...) means the same thing here.
   const rest = pathname === `/h/${site.slug}` ? "/" : pathname.startsWith(`/h/${site.slug}/`) ? pathname.slice(`/h/${site.slug}`.length) : pathname;
-  return rewriteToSite(req, site.slug, "", rest);
+  return rewriteToSite(req, site.slug, "", rest, undefined, customHost);
 }
 
 export const config = {

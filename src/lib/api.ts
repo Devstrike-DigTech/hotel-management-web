@@ -96,9 +96,13 @@ export const api = {
   hotels: (q: HotelQuery = {}) =>
     request<Paginated<HotelCard>>(`/public/hotels${qs({ ...q })}`, { revalidate: 60, tags: ["hotels"] }),
   /** Returns null when the hotel does not exist (404). */
-  hotel: async (slug: string): Promise<HotelDetail | null> => {
+  /**
+   * `host` (M6) is the custom domain the page is being served on; the API answers with the hotel's
+   * white-label brand only when that host is the property's verified domain.
+   */
+  hotel: async (slug: string, host?: string | null): Promise<HotelDetail | null> => {
     try {
-      return await request<HotelDetail>(`/public/hotels/${encodeURIComponent(slug)}`, {
+      return await request<HotelDetail>(`/public/hotels/${encodeURIComponent(slug)}${qs({ host })}`, {
         revalidate: 60,
         tags: ["hotels", `hotel:${slug}`],
       });

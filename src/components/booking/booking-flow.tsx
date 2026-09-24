@@ -62,7 +62,8 @@ export interface BookingSite {
   /** Absolute origin + path Paystack should return to; computed in the browser when omitted. */
   hotelHref: string;
   devMode: boolean;
-  appName: string;
+  /** The platform's name, or null on a white-labelled hotel's own domain. */
+  appName: string | null;
 }
 
 export type StayKind = "overnight" | "dayuse";

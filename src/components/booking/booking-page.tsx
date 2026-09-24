@@ -3,6 +3,7 @@ import { ArrowLeft } from "@phosphor-icons/react/ssr";
 import type { BookingChannel } from "@/lib/booking-types";
 import type { ISODate } from "@/lib/dates";
 import { APP_NAME } from "@/lib/env";
+import { hidesPlatform } from "@/lib/white-label";
 import type { HotelDetail } from "@/lib/types";
 import { BookingFlow } from "./booking-flow";
 
@@ -47,7 +48,7 @@ export function BookingPage({
             booking: hotel.booking ?? null,
             groupName: hotel.group?.name ?? null,
           }}
-          site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: APP_NAME }}
+          site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: hidesPlatform(hotel.whiteLabel) ? null : APP_NAME }}
           today={today}
           initial={initial}
         />

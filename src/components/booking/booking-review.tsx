@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BookingCreated, BookingView, PaymentInit, PaymentMode, PaymentStatusView, Quote } from "@/lib/booking-types";
 import { call, ClientApiError, getClockSkew, humanError, newKey } from "@/lib/client-api";
-import { APP_NAME, SITE_URL } from "@/lib/env";
+import { SITE_URL } from "@/lib/env";
 import { formatNaira, formatPhone, toE164Digits } from "@/lib/format";
 import { formatLagosClock, formatLagosDateTime, policyTail } from "@/lib/time";
 import { diffDays, formatShort, formatWeekday } from "@/lib/dates";
@@ -623,7 +623,7 @@ export function BookingReview({
               data-testid="consent"
             />
             <span>
-              I agree that {hotel.name} and {APP_NAME} may use my details to arrange this stay and contact me about it, as the Nigeria Data Protection Act 2023
+              I agree that {hotel.name} and {site.appName ?? "its booking provider"} may use my details to arrange this stay and contact me about it, as the Nigeria Data Protection Act 2023
               allows.{consentError && !consent ? " Please tick this to continue." : ""}
             </span>
           </label>

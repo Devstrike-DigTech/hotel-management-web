@@ -994,3 +994,11 @@
     inset 2px 0 0 var(--laterite),
     inset 0 0 0 1px var(--line);
 }
+
+/* White-label (M6): the hotel's second colour takes the brass role. */
+.brand-scope[style*="--brand-2"] {
+  --brass: var(--brand-2);
+}
+[data-theme="dark"] .brand-scope[style*="--brand-2"] {
+  --brass: var(--brand-2-dark);
+}

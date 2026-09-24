@@ -64,7 +64,7 @@ export interface ConfirmationData {
  * mono, arrival and departure as big figures, a ledger with dotted leaders, an inked stamp,
  * and a perforated stub with the things you do next.
  */
-export function ConfirmationCard({ data, appName, shareUrl }: { data: ConfirmationData; appName: string; shareUrl?: string }) {
+export function ConfirmationCard({ data, appName, shareUrl }: { data: ConfirmationData; appName: string | null; shareUrl?: string }) {
   const paidInFull = data.balanceKobo <= 0 && data.paidKobo > 0;
   const cancelled = data.status === "CANCELLED";
   const stampTone = cancelled ? "var(--danger)" : paidInFull ? "var(--palm)" : "var(--brass)";
@@ -273,12 +273,12 @@ function Perforation() {
   );
 }
 
-function Stub({ data, appName, shareUrl }: { data: ConfirmationData; appName: string; shareUrl?: string }) {
+function Stub({ data, appName, shareUrl }: { data: ConfirmationData; appName: string | null; shareUrl?: string }) {
   const [copied, setCopied] = useState(false);
   const address = data.hotel.address || `${data.hotel.area}, ${data.hotel.city}`;
   const directions = mapsUrl(data.hotel.name, address);
   const event: StayEvent = {
-    uid: `${data.code}@${appName.toLowerCase().replace(/\s+/g, "")}`,
+    uid: `${data.code}@${(appName ?? data.hotel.name).toLowerCase().replace(/[^a-z0-9]+/g, "")}`,
     title: `${data.hotel.name}: ${data.roomTypeName}`,
     checkIn: data.checkIn,
     checkOut: data.checkOut,
@@ -339,7 +339,7 @@ function Stub({ data, appName, shareUrl }: { data: ConfirmationData; appName: st
             or call <a className="num link-static text-ink" href={`tel:${data.hotel.phone.replace(/\s/g, "")}`}>{formatPhone(data.hotel.phone)}</a>
           </>
         ) : null}
-        . Booked through {appName}.
+        .{appName ? ` Booked through ${appName}.` : ""}
       </p>
     </footer>
   );

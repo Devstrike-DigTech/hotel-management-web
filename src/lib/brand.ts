@@ -42,16 +42,16 @@ export interface BrandVars {
   darkInk: string;
 }
 
-export function brandVars(accent: string | null | undefined): BrandVars | null {
+export function brandVars(accent: string | null | undefined, minContrast = 4.5): BrandVars | null {
   if (!accent) return null;
   let rgb = parseHex(accent);
   if (!rgb) return null;
-  // Keep the accent legible as text on paper: darken until it reaches 4.5:1.
+  // Keep the accent legible as text on paper: darken until it reaches the target contrast.
   let guard = 0;
-  while (contrast(rgb, PAPER) < 4.5 && guard++ < 20) rgb = mix(rgb, [0, 0, 0], 0.08);
+  while (contrast(rgb, PAPER) < minContrast && guard++ < 30) rgb = mix(rgb, [0, 0, 0], 0.08);
   let dark = mix(rgb, [255, 255, 255], 0.28);
   guard = 0;
-  while (contrast(dark, DARK_PAPER) < 4.5 && guard++ < 20) dark = mix(dark, [255, 255, 255], 0.08);
+  while (contrast(dark, DARK_PAPER) < minContrast && guard++ < 30) dark = mix(dark, [255, 255, 255], 0.08);
   const inkFor = (c: RGB) => (contrast(c, LIGHT_INK) >= contrast(c, DARK_INK) ? toHex(LIGHT_INK) : toHex(DARK_INK));
   return { light: toHex(rgb), lightInk: inkFor(rgb), dark: toHex(dark), darkInk: inkFor(dark) };
 }
@@ -66,4 +66,11 @@ export function brandStyle(accent: string | null | undefined): React.CSSProperti
     "--brand-dark": v.dark,
     "--brand-dark-ink": v.darkInk,
   } as React.CSSProperties;
+}
+
+/** Exposed for tests and the white-label theme: WCAG contrast of two hex colours. */
+export function contrastOf(a: string, b: string) {
+  const x = parseHex(a);
+  const y = parseHex(b);
+  return x && y ? contrast(x, y) : 0;
 }

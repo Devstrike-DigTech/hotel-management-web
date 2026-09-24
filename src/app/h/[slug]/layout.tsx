@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, Phone } from "@phosphor-icons/react/ssr";
+import { Phone } from "@phosphor-icons/react/ssr";
+import { BrandFonts, FooterLinks, PoweredBy } from "@/components/site/brand-kit";
+import { SiteLinksProvider } from "@/components/site/site-links";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Monogram } from "@/components/ui/monogram";
-import { KeyFob } from "@/components/ui/wordmark";
 import { brandStyle } from "@/lib/brand";
-import { APP_NAME, SITE_URL } from "@/lib/env";
+import { SITE_URL } from "@/lib/env";
 import { formatPhone, toE164Digits } from "@/lib/format";
 import { canonicalSite, getHotel, groupRootHref, siteBase } from "@/lib/site";
+import { hidesPlatform, whiteLabelTheme } from "@/lib/white-label";
 
 export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -17,14 +19,17 @@ export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Pr
   // The hotel's canonical address (its verified custom domain, else its subdomain), however this copy was reached.
   const canonical = await canonicalSite(hotel);
   const description = `${hotel.tagline}. Book direct with ${hotel.name} in ${hotel.area}, ${hotel.city}.`;
+  const wl = hotel.whiteLabel ?? null;
   return {
     metadataBase: new URL(new URL(canonical).origin || SITE_URL),
     title: { default: `${hotel.name}, ${hotel.area}`, template: `%s — ${hotel.name}` },
     description,
-    applicationName: hotel.name,
+    applicationName: wl?.brandName || hotel.name,
+    // White-label (M6): the hotel's own favicon replaces the platform's key fob.
+    ...(wl?.faviconUrl ? { icons: { icon: [{ url: wl.faviconUrl }], shortcut: [{ url: wl.faviconUrl }], apple: [{ url: wl.faviconUrl }] } } : {}),
     alternates: { canonical: `${canonical}/` },
     openGraph: {
-      siteName: hotel.name,
+      siteName: wl?.brandName || hotel.name,
       title: hotel.name,
       description: hotel.tagline,
       url: `${canonical}/`,
@@ -45,15 +50,26 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
   const phone = hotel.phone ? toE164Digits(hotel.phone) : null;
   const group = hotel.group && hotel.group.propertyCount > 1 ? hotel.group : null;
   const groupHref = group ? await groupRootHref(slug, group.slug) : null;
+  // White-label (M6): on the hotel's verified domain, its own colours, type, logo and footer, and no platform chrome.
+  const wl = hotel.whiteLabel ?? null;
+  const hide = hidesPlatform(wl);
+  const theme = wl ? whiteLabelTheme(wl, hotel.branding.accentColor) : null;
+  const logo = wl?.logoUrl || hotel.branding.logoUrl;
+  const brandName = wl?.brandName || hotel.name;
 
   return (
-    <div className="brand-scope flex min-h-dvh flex-col" style={brandStyle(hotel.branding.accentColor)}>
+    <div
+      className="brand-scope flex min-h-dvh flex-col font-sans"
+      style={theme?.style ?? brandStyle(hotel.branding.accentColor)}
+      data-white-label={wl ? "true" : undefined}
+    >
+      {theme ? <BrandFonts hrefs={theme.fonts} /> : null}
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-[6px]">
         <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
           <Link href={home} className="-m-1 flex min-w-0 items-center gap-3 rounded-sm p-1">
-            {hotel.branding.logoUrl ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element -- hotel logos live on arbitrary hosts
-              <img src={hotel.branding.logoUrl} alt="" className="h-10 w-auto max-w-[8rem] object-contain" />
+              <img src={logo} alt="" className="h-10 w-auto max-w-[8rem] object-contain" data-testid="site-logo" />
             ) : (
               <Monogram name={hotel.name} />
             )}
@@ -105,7 +121,7 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
       </header>
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
-        {children}
+        <SiteLinksProvider value={{ whiteLabel: hide, base: hide ? base : "", home }}>{children}</SiteLinksProvider>
       </main>
 
       <footer className="mt-24 border-t border-line bg-surface">
@@ -150,13 +166,10 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
         <div className="border-t border-line">
           <div className="container-page flex flex-col gap-2 py-5 text-xs text-ink-muted sm:flex-row sm:items-center sm:justify-between">
             <p>
-              <span className="num">&copy; {new Date().getFullYear()}</span> {hotel.name}
+              <span className="num">&copy; {new Date().getFullYear()}</span> {brandName}
             </p>
-            <a href={SITE_URL} className="group inline-flex items-center gap-2 hover:text-ink">
-              <KeyFob className="h-4 w-auto text-ink-muted group-hover:text-laterite" />
-              Powered by <span className="font-medium text-ink">{APP_NAME}</span>
-              <ArrowUpRight size={12} aria-hidden />
-            </a>
+            {wl ? <FooterLinks wl={wl} /> : null}
+            {hide ? null : <PoweredBy />}
           </div>
         </div>
       </footer>

@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight } from "@phosphor-icons/react/ssr";
+import { BrandFonts, FooterLinks, PoweredBy } from "@/components/site/brand-kit";
 import { Monogram } from "@/components/ui/monogram";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { KeyFob } from "@/components/ui/wordmark";
 import { brandStyle } from "@/lib/brand";
-import { APP_NAME, SITE_URL } from "@/lib/env";
-import { canonicalGroup, getGroup, groupBase } from "@/lib/site";
+import { canonicalGroup, getGroup, getGroupWhiteLabel, groupBase } from "@/lib/site";
+import { hidesPlatform, whiteLabelTheme } from "@/lib/white-label";
 
 export async function generateMetadata({ params }: LayoutProps<"/g/[group]">): Promise<Metadata> {
   const { group: slug } = await params;
@@ -16,11 +15,13 @@ export async function generateMetadata({ params }: LayoutProps<"/g/[group]">): P
   const canonical = canonicalGroup(group.slug);
   const places = [...new Set(group.properties.map((p) => p.area))].join(", ");
   const description = `${group.properties.length} hotels in ${places}. Book direct with ${group.name}.`;
+  const wl = await getGroupWhiteLabel(group);
   return {
     metadataBase: new URL(canonical),
     title: { default: group.name, template: `%s — ${group.name}` },
     description,
-    applicationName: group.name,
+    applicationName: wl?.brandName || group.name,
+    ...(wl?.faviconUrl ? { icons: { icon: [{ url: wl.faviconUrl }], shortcut: [{ url: wl.faviconUrl }], apple: [{ url: wl.faviconUrl }] } } : {}),
     alternates: { canonical: `${canonical}/` },
     openGraph: {
       siteName: group.name,
@@ -41,14 +42,24 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
   if (!group) notFound();
   const base = await groupBase(slug);
   const home = base || "/";
+  const wl = await getGroupWhiteLabel(group);
+  const hide = hidesPlatform(wl);
+  const theme = wl ? whiteLabelTheme(wl, group.branding.accentColor) : null;
+  const logo = wl?.logoUrl || group.branding.logoUrl;
+  const brandName = wl?.brandName || group.name;
   return (
-    <div className="brand-scope flex min-h-dvh flex-col" style={brandStyle(group.branding.accentColor)}>
+    <div
+      className="brand-scope flex min-h-dvh flex-col font-sans"
+      style={theme?.style ?? brandStyle(group.branding.accentColor)}
+      data-white-label={wl ? "true" : undefined}
+    >
+      {theme ? <BrandFonts hrefs={theme.fonts} /> : null}
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-[6px]">
         <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
           <Link href={home} className="-m-1 flex min-w-0 items-center gap-3 rounded-sm p-1">
-            {group.branding.logoUrl ? (
+            {logo ? (
               // eslint-disable-next-line @next/next/no-img-element -- hotel logos live on arbitrary hosts
-              <img src={group.branding.logoUrl} alt="" className="h-10 w-auto max-w-[8rem] object-contain" />
+              <img src={logo} alt="" className="h-10 w-auto max-w-[8rem] object-contain" data-testid="site-logo" />
             ) : (
               <Monogram name={group.name} />
             )}
@@ -90,13 +101,10 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
         <div className="border-t border-line">
           <div className="container-page flex flex-col gap-2 py-5 text-xs text-ink-muted sm:flex-row sm:items-center sm:justify-between">
             <p>
-              <span className="num">&copy; {new Date().getFullYear()}</span> {group.name}
+              <span className="num">&copy; {new Date().getFullYear()}</span> {brandName}
             </p>
-            <a href={SITE_URL} className="group inline-flex items-center gap-2 hover:text-ink">
-              <KeyFob className="h-4 w-auto text-ink-muted group-hover:text-laterite" />
-              Powered by <span className="font-medium text-ink">{APP_NAME}</span>
-              <ArrowUpRight size={12} aria-hidden />
-            </a>
+            {wl ? <FooterLinks wl={wl} /> : null}
+            {hide ? null : <PoweredBy />}
           </div>
         </div>
       </footer>

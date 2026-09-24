@@ -3,10 +3,22 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { api } from "./api";
 import { APP_DOMAIN, SITE_URL } from "./env";
-import type { HotelDetail } from "./types";
+import type { HotelDetail, HotelGroup } from "./types";
 
-/** Hotel lookups are shared between a microsite layout, its page and its metadata. */
-export const getHotel = cache((slug: string) => api.hotel(slug));
+/**
+ * The custom domain this microsite is being served on (set by src/proxy.ts), or null on the
+ * platform's own hosts and the path fallback. Only the proxy can set it.
+ */
+export async function siteHost(): Promise<string | null> {
+  const h = await headers();
+  return h.get("x-site-host") || null;
+}
+
+/**
+ * Hotel lookups are shared between a microsite layout, its page and its metadata. On a custom
+ * domain the host goes to the API, which then includes the hotel's white-label brand (M6).
+ */
+export const getHotel = cache(async (slug: string) => api.hotel(slug, await siteHost()));
 export const getGroup = cache((slug: string) => api.group(slug));
 
 /**
@@ -19,6 +31,21 @@ export async function siteBase(slug: string) {
   const base = h.get("x-site-base");
   return base === null ? `/h/${slug}` : base;
 }
+
+/**
+ * A group root's white-label brand (M6). The API attaches it to property detail when the request
+ * host is a verified domain, so a group root served on a custom domain asks its properties with
+ * that host and uses the first brand it gets. Null on platform hosts.
+ */
+export const getGroupWhiteLabel = cache(async (group: HotelGroup) => {
+  const host = await siteHost();
+  if (!host) return null;
+  for (const p of group.properties) {
+    const detail = await api.hotel(p.slug, host).catch(() => null);
+    if (detail?.whiteLabel) return detail.whiteLabel;
+  }
+  return null;
+});
 
 /** The same for a group's root: "" on the group's host, "/g/{group}" on the path fallback. */
 export async function groupBase(group: string) {

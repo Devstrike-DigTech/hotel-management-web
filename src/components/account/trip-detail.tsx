@@ -23,6 +23,7 @@ import { toConfirmation } from "../booking/confirmation-view";
 import { HoldCountdown } from "../booking/hold-countdown";
 import { Notice } from "../ui/field";
 import { useGuestHint } from "./account-link";
+import { useSiteLinks } from "../site/site-links";
 import { CancelDialog } from "./cancel-dialog";
 import { StatusChip } from "./status-chip";
 import { WhatsAppChat } from "../chat/whatsapp-chat";
@@ -30,9 +31,12 @@ import { useHotelChat } from "../chat/use-hotel-chat";
 import { PointsToEarn } from "../loyalty/redeem-points";
 import { JoinProgramme } from "../loyalty/join-programme";
 
-export function TripDetail({ code, appName }: { code: string; appName: string }) {
+export function TripDetail({ code, appName }: { code: string; appName: string | null }) {
   const token = useSearchParams().get("t");
-  const signedIn = !!useGuestHint();
+  const site = useSiteLinks();
+  // Guest accounts live on the marketplace; a white-labelled hotel's own domain only has link access.
+  const hint = useGuestHint();
+  const signedIn = !!hint && !site.whiteLabel;
   const [booking, setBooking] = useState<BookingView | null>(null);
   const [error, setError] = useState<{ message: string; gone?: boolean } | null>(token ? null : { message: "This page needs the link from your confirmation.", gone: true });
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -62,10 +66,18 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
         <p className="kicker">Booking {code}</p>
         <h1 className="display-md mt-3 text-4xl">{error.message}</h1>
         <p className="mt-4 text-ink-muted">
-          {error.gone ? "Sign in with the number you booked with to see all your trips." : "Check your connection and try again."}
+          {error.gone
+            ? site.whiteLabel
+              ? "Use the link in your confirmation message, or contact the hotel."
+              : "Sign in with the number you booked with to see all your trips."
+            : "Check your connection and try again."}
         </p>
         <div className="mt-8 flex justify-center gap-3">
-          {error.gone ? (
+          {error.gone && site.whiteLabel ? (
+            <Link href={site.home} className="btn btn-primary">
+              Back to the hotel
+            </Link>
+          ) : error.gone ? (
             <Link href={`/account/sign-in?next=/trips`} className="btn btn-primary">
               Sign in
             </Link>
@@ -172,7 +184,7 @@ export function TripDetail({ code, appName }: { code: string; appName: string })
               <p className="mt-1 text-sm text-ink-muted">
                 Your review helps the next guest and the hotel.{b.review.deadline ? ` Open until ${formatLong(b.review.deadline.slice(0, 10))}.` : ""}
               </p>
-              <Link href={`/review?t=${encodeURIComponent(b.review.token)}`} className="btn btn-ink mt-4 w-full" data-testid="review-cta">
+              <Link href={`${site.base}/review?t=${encodeURIComponent(b.review.token)}`} className="btn btn-ink mt-4 w-full" data-testid="review-cta">
                 Write a review <ArrowRight size={15} aria-hidden />
               </Link>
             </section>
@@ -261,10 +273,11 @@ function PayPanel({ booking, onChanged }: { booking: BookingView; onChanged: () 
 }
 
 function Documents({ booking, token, onIssued }: { booking: BookingView; token: string; onIssued: () => void }) {
+  const site = useSiteLinks();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const q = `?t=${encodeURIComponent(token)}`;
-  const base = `/trips/${encodeURIComponent(booking.code)}/documents`;
+  const base = `${site.base}/trips/${encodeURIComponent(booking.code)}/documents`;
   const { invoices, receipts } = booking.documents;
   const cancelled = booking.status === "CANCELLED";
   if (cancelled && !invoices.length && !receipts.length) return null;
