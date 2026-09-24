@@ -292,7 +292,7 @@ export function MobileBookBar({ fromKobo }: { fromKobo: number | null }) {
   const data = nights && availability.status === "ready" ? availability.data : null;
   const cheapest = cheapestTotal(data);
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-[6px] lg:hidden print:hidden">
+    <div data-pinned-bar className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-[6px] lg:hidden print:hidden">
       <div className="mx-auto flex max-w-xl items-center justify-between gap-4">
         <p className="text-sm leading-tight text-ink-muted">
           {cheapest !== null ? (

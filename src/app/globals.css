@@ -1002,3 +1002,10 @@
 [data-theme="dark"] .brand-scope[style*="--brand-2"] {
   --brass: var(--brand-2-dark);
 }
+
+/* The phone's pinned price bar must never cover the end of the page (the footer's last line). */
+@media (width < 64rem) {
+  body:has([data-pinned-bar]) {
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+}

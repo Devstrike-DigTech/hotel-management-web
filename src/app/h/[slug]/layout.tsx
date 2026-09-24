@@ -7,7 +7,7 @@ import { SiteLinksProvider } from "@/components/site/site-links";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Monogram } from "@/components/ui/monogram";
 import { brandStyle } from "@/lib/brand";
-import { SITE_URL } from "@/lib/env";
+import { APP_DOMAIN, SITE_URL } from "@/lib/env";
 import { formatPhone, toE164Digits } from "@/lib/format";
 import { canonicalSite, getHotel, groupRootHref, siteBase } from "@/lib/site";
 import { hidesPlatform, whiteLabelTheme } from "@/lib/white-label";
@@ -40,6 +40,16 @@ export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Pr
   };
 }
 
+/** True for an absolute link to the platform's own domain or its subdomains (or local ones). */
+function onPlatformHost(href: string) {
+  try {
+    const host = new URL(href).hostname;
+    return host === APP_DOMAIN || host.endsWith(`.${APP_DOMAIN}`) || host.endsWith(".localhost");
+  } catch {
+    return false; // a relative link stays on this host
+  }
+}
+
 export default async function MicrositeLayout({ children, params }: LayoutProps<"/h/[slug]">) {
   const { slug } = await params;
   const hotel = await getHotel(slug);
@@ -49,10 +59,12 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
   const anchor = (id: string) => (base ? `${base}#${id}` : `/#${id}`);
   const phone = hotel.phone ? toE164Digits(hotel.phone) : null;
   const group = hotel.group && hotel.group.propertyCount > 1 ? hotel.group : null;
-  const groupHref = group ? await groupRootHref(slug, group.slug) : null;
   // White-label (M6): on the hotel's verified domain, its own colours, type, logo and footer, and no platform chrome.
   const wl = hotel.whiteLabel ?? null;
   const hide = hidesPlatform(wl);
+  // A white-labelled hotel never links to the group root on the platform's own subdomain.
+  const rootHref = group ? await groupRootHref(slug, group.slug) : null;
+  const groupHref = rootHref && hide && onPlatformHost(rootHref) ? null : rootHref;
   const theme = wl ? whiteLabelTheme(wl, hotel.branding.accentColor) : null;
   const logo = wl?.logoUrl || hotel.branding.logoUrl;
   const brandName = wl?.brandName || hotel.name;

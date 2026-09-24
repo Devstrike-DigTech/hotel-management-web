@@ -71,6 +71,8 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `MARKETPLACE_HOSTS` | `staging.example.com` | Optional. Extra hosts that should serve the marketplace |
 | `TRUSTED_PROXY_SECRET` | a long random string | Server-only. Sent as `X-Proxy-Auth` with the visitor's `X-Client-IP`; must equal the backend's value (see "Trusted client address") |
 | `CLIENT_IP_HEADER` | `cf-connecting-ip` | Optional. A header your host sets with the visitor's address that clients cannot forge |
+| `NEXT_PUBLIC_PARTNER_API_URL` | `https://api.hotelos.ng/api/partner/v1` | Optional (M6). The partner API base the developer docs show; defaults to `NEXT_PUBLIC_API_URL` + `/api/partner/v1` |
+| `ALLOWED_DEV_ORIGINS` | `harmattanhotels.com,**.harmattanhotels.com` | Development only (M6). Custom domains pointed at your machine that may load dev assets; defaults to the white-label demo |
 
 `NEXT_PUBLIC_*` values are inlined at build time, so rebuild after changing them.
 
@@ -87,13 +89,16 @@ Routing is done in `src/proxy.ts` (Next 16 renamed middleware to proxy; it runs 
 | Any other host | Looked up with `GET /public/resolve-host?host=...`; a verified custom domain gets its hotel, anything else a 404 |
 | `{group}.APP_DOMAIN` of a hotel group (M5, `kind: GROUP`) | The group's root: `/` lists its hotels, `/{property slug}/...` is that hotel's microsite, other paths redirect to the first hotel |
 | `/h/{slug}/...` on a marketplace host | Path fallback to the microsite, so it works on plain `localhost:3000` |
+| `/developers/...` on any hotel host (subdomain, custom domain, group) | 404: the developer docs belong to the marketplace host only (M6) |
 | `/g/{group}/...` on a marketplace host | Path fallback to a group's root (M5) |
 
 Hotel hosts are rewritten internally to `/h/{slug}{path}` (group roots to `/g/{group}{path}`). The proxy also sets an
 `x-site-base` request header: empty on a hotel's own host, `/h/{slug}` on the path fallback, `/{slug}` for a hotel shown
 under its group's host (with `x-site-group` saying where the group's root is). The microsite builds all of its links from it,
 so the same pages work under both schemes. Incoming `x-site-base` headers are always stripped on marketplace
-routes, so a client cannot spoof it.
+routes, so a client cannot spoof it. On a custom domain (M6) the proxy also sets `x-site-host`, which the microsite passes to
+`GET /public/hotels/:slug?host=` so the API can answer with a white-labelled hotel's brand; client copies of every `x-site-*`
+header are dropped.
 
 Subdomains are resolved through the API as `{slug}.APP_DOMAIN`, so the backend stays the authority on which
 hotels exist. Results are cached in memory per host for 5 minutes (misses for 1 minute). If the API is
@@ -128,6 +133,10 @@ Each microsite has its own `robots.txt`, `sitemap.xml` and OpenGraph card in its
 | `/for-hotels` | The sales page: revenue leakage, Revenue Guard, offline desk, day use, the owner digest |
 | `/pricing` | Plans and features from the API, monthly or yearly, comparison table, FAQ |
 | `/sitemap.xml`, `/robots.txt`, `opengraph-image` | SEO, with OG cards drawn in the brand fonts |
+| `/developers`, `/developers/{guide}` | M6 developer docs: overview and nine guides (marketplace host only) |
+| `/developers/reference`, `/developers/reference/[group]` | M6 API reference, rendered from the partner API's OpenAPI document |
+| `/developers/openapi.json` | The spec the reference was built from, to import into Postman or a generator |
+| `/h/[slug]/trips/[code]`, `/h/[slug]/review` | M6: manage a booking and review a stay on a white-labelled hotel's own domain |
 
 ## Design notes: "Laterite and Adire"
 
@@ -182,7 +191,8 @@ src/
     (marketplace)/            home, stays, hotel page, booking and confirmation, account, trips, review, for-hotels, pricing
     api/v1/[...path]/         same-origin gateway to the backend (guest sessions in httpOnly cookies)
     pay/mock/, dev/           development-only checkout, mailbox and preview
-    h/[slug]/                 hotel microsite (layout, page, book, robots, sitemap, og.png)
+    h/[slug]/                 hotel microsite (layout, page, book, robots, sitemap, og.png; M6 trips, documents, review)
+    developers/               M6 developer docs: overview, guides, reference, openapi.json
     g/[group]/                hotel group root (layout, page, robots, sitemap, og.png)
     opengraph-image.tsx, sitemap.ts, robots.ts, not-found.tsx, error.tsx, icon.svg
   components/
@@ -197,6 +207,8 @@ src/
     pricing/                  tiers and comparison table
     marketing/                city index cards, illustrations, product vignettes
     ui/                       wordmark, photo plate, money, amenity icons, theme toggle
+    developers/               M6 docs shell, search, code plates and tabs, schema tree, operation, guide frame
+    site/                     M6 white-label: brand fonts, footer links, platform credit, the site-links context
   lib/
     api.ts, types.ts          typed, server-only client for the public API
     rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
@@ -209,6 +221,8 @@ src/
     env.ts                    identity and URLs from the environment
     dates.ts, format.ts       Lagos dates, naira, VAT
     brand.ts                  hotel accent re-tinting with contrast checks
+    white-label.ts            M6: a hotel's colours and fonts as tokens, safe font URLs and footer links
+    developers/               M6: OpenAPI model, example and sample generation, highlighter, guides, search index
     site.ts                   microsite base path and origin
     og.tsx, og-hotel.tsx      OpenGraph image helpers (static TTFs in src/assets/og)
 ```
@@ -514,6 +528,74 @@ Hotels without the feature no longer show a WhatsApp link at all, since nobody w
 |---|---|
 | `m5.spec.ts` | The group root (`/g/palmwine-house`) lists both hotels in order; Ikoyi's entry opens its microsite and both hotels book on their own sites. The group's own host (`palmwine-house.localhost`) lists them and serves `/{slug}`, whose canonical link is the API's `canonicalUrl`. The marketplace shows each property "Part of" the group. A fresh member credited 3,000 points by the hotel (staff API) uses them at review: the ledger, the hold, the mock checkout and the card all carry the lower total, and the balance is 0 afterwards (API and `/account/points`). A member's stay tonight, checked in and out through the staff API, shows the points earned on the trip and in the trips list, and they reach the balance. WhatsApp chat shows on a Pro hotel and not on a Growth one, and the confirmation's and trip's links carry the booking code |
 
+## Milestone 6: white-label and the developer docs
+
+The Enterprise tier on the guest side. The contract is the backend's `API-M6.md` (sections 12, 13.4 and 14).
+
+<!-- M6-SHOTS -->
+
+### White-label booking sites
+
+A white-labelled hotel (feature `white_label`) is served on its verified custom domain as if the platform were not there.
+
+- **How it is recognised.** The host proxy resolves the domain as before; for a custom domain (not `{slug}.APP_DOMAIN`) it also
+  passes the host on as `x-site-host`, and the microsite asks `GET /public/hotels/:slug?host=...`. The API returns `whiteLabel`
+  only when white-label is active and the host is that property's verified domain, so the same hotel on the platform's subdomain,
+  the path fallback or the marketplace keeps the normal chrome.
+- **No platform chrome.** No "Powered by", no key fob, no marketplace or account links, no platform name in the booking consent
+  ("the hotel and its booking provider"), on the confirmation card or on printed documents. The group root on the platform's
+  subdomain is not linked either.
+- **The hotel's own brand.** Logo, favicon (in place of the platform icon), brand name in the copyright line and social card, and up
+  to eight footer links (http, https, mailto and tel only).
+- **Colours, with contrast kept.** The primary colour takes the laterite role (buttons, links, italic accents) and is darkened in
+  light mode, or lifted in dark mode, until it reaches 4.5:1 on paper; the accent colour takes the brass role at 3:1. Text on buttons
+  is chosen by contrast. Paper and ink stay the house's, so body copy never loses legibility.
+- **Fonts.** The curated Google font the hotel chose for headings takes the display role; its body font is used only if it is a
+  text face (a display face as body copy is ignored and the house grotesk stays). Money, dates and codes stay in IBM Plex Mono so
+  figures still line up. Font URLs are accepted only from `fonts.googleapis.com` (anything else is rebuilt from the family name), and
+  family names are checked before they go into CSS. The server sends preconnect and preload hints and a small client component
+  attaches the stylesheets after hydration: a blocked or slow Google Fonts request can never hold the page (a React-managed
+  stylesheet would), and `display=swap` keeps text readable meanwhile.
+- **The guest never leaves the domain.** Manage booking, invoices and receipts, and the review form are served on the hotel's own
+  domain (`/trips/{code}?t=`, `/trips/{code}/documents/...`, `/review?t=`), by the same token links as the marketplace. Guest
+  accounts stay on the marketplace, so "All your trips" and sign-in are not offered there.
+- **Group roots** on a custom domain use the brand the API returns for their properties with that host.
+- Emails, SMS sender IDs and the PDF print views are white-labelled by the backend.
+
+### Developer docs
+
+`/developers` is the partner API's documentation, on the marketplace host only (every hotel host answers 404).
+
+- **Guides**: overview, getting started (create a key in the hotel admin, first request with curl), authentication and scopes (key
+  anatomy, property and IP restrictions, rotation), test and live keys (dry runs), pagination (cursors, `updatedSince` sync), errors
+  (the envelope and every code), rate limits (the `RateLimit-*` headers and backing off), idempotency, webhooks (how delivery works,
+  the event catalogue with each event's object, the payload, signature verification in Node, PHP and Python, retries and
+  auto-disable, replay and test pings) and the changelog.
+- **The reference is rendered in-house from `/api/partner/v1/openapi.json`**, fetched at build time and again every five minutes
+  (ISR); if the API cannot be reached the copy committed in `src/content/developers/` is used and the page says so. Endpoints are
+  grouped by tag, each with its method stamp, path, scope, `Idempotency-Key` requirement, parameters, request body and responses as
+  schema trees whose nested objects open on demand (`$ref`, `allOf`, `oneOf`, nullable and cycles handled), and example requests in
+  curl, Node and Python generated from the spec, beside an example response. The event catalogue and changelog come from the spec's
+  `webhooks` and `x-changelog`.
+- **Reading aids**: an ink code plate with an in-house highlighter (no dependency), copy buttons, one language switch shared by every
+  sample on the page and remembered in `localStorage` (guarded), arrow keys between languages, deep links to every endpoint and
+  section, `Ctrl/Cmd+K` search over guides, sections and endpoints, a sticky sidebar and an on-page contents with scroll-spy, a
+  full-height contents sheet on phones.
+
+### Dedicated databases
+
+Harmattan's data lives in its own database (`hotel_t_harmattan`); the marketplace reads the backend's public listing projection.
+Nothing changed in the web app: marketplace search, the hotel page and booking work the same, and a test books a Harmattan hotel end
+to end.
+
+### Tests (M6)
+
+| Spec | What it proves |
+|---|---|
+| `developers.spec.ts` | The reference lists exactly the live spec's operations and says it was rendered from it; an endpoint shows its path, scope, Idempotency-Key and a nested body that opens on demand; choosing Python switches every sample, copies to the clipboard, and is remembered across pages and reloads; arrow keys move between languages; `Ctrl+K` finds an endpoint and a guide section and lands on it; deep links; the webhook catalogue matches the spec, verification in three languages; `/developers` is 404 on a subdomain, the path fallback and the white-labelled domain |
+| `white-label.spec.ts` | On `book.harmattanhotels.com` (resolved to this machine by the browser, so the request carries the real `Host`): no platform name, credit or marketplace link on the hotel page or the booking page, the accent is the hotel's colour after the contrast guard, headings and body use the hotel's fonts, its favicon replaces the platform's, its footer links and brand name; the same hotel on the platform subdomain keeps the normal chrome. Then a booking on the domain, the confirmation without "Booked through", and managing it, all on the same domain |
+| `harmattan.spec.ts` | Harmattan (dedicated database) is found by marketplace search and booked end to end with the mock Paystack checkout |
+
 ## Testing
 
 ```bash
@@ -532,6 +614,7 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `rates.spec.ts` | M4: promo code booking (saving shown and charged), non-refundable rate (microsite and review step), a Detty December stay priced night by night (see the M4 section) |
 | `trusted-ip.spec.ts` | M4: which visitor address is sent and how, the secret absent from browser bundles, and live per-visitor rate-limit buckets |
 | `m5.spec.ts` | M5: the group root and booking each of its hotels, the group host, "Part of" on the marketplace, redeeming points at booking, points earned after check-out, WhatsApp chat only on Pro hotels (see the M5 section) |
+| `developers.spec.ts`, `white-label.spec.ts`, `harmattan.spec.ts` | M6: the docs and reference, white-label on a custom domain, Harmattan on its dedicated database (see the M6 section) |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the
