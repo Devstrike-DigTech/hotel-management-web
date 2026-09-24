@@ -82,8 +82,9 @@ test("a white-labelled hotel's own domain carries its brand and no platform chro
         { timeout: 90_000, intervals: [5_000] },
       )
       .toBe(brandVars(wl.primaryColor)!.light);
-    const button = await page.getByRole("link", { name: "Book a room" }).first().evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(button).not.toBe("rgb(180, 69, 42)"); // the platform's laterite
+    // The header's way to book, whatever the template calls it and whether it is filled or outlined (M7).
+    const book = await page.getByTestId("site-book").first().evaluate((el) => { const cs = getComputedStyle(el); return [cs.backgroundColor, cs.borderTopColor, cs.color]; });
+    expect(book).not.toContain("rgb(180, 69, 42)"); // the platform's laterite
   }
   // Its chosen fonts: the heading font on headings, the body font (a text face) on copy.
   if (wl.headingFont) {

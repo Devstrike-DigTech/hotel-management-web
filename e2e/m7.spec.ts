@@ -81,12 +81,17 @@ test.describe("booking-site templates", () => {
 test("Essentials stays inside its JavaScript budget", async ({ page }) => {
   let js = 0;
   const scripts: string[] = [];
-  page.on("requestfinished", async (req) => {
+  const onScript = async (req: import("@playwright/test").Request) => {
     if (req.resourceType() !== "script") return;
-    const sizes = await req.sizes();
-    js += sizes.responseBodySize + sizes.responseHeadersSize;
     scripts.push(req.url());
-  });
+    try {
+      const sizes = await req.sizes();
+      js += sizes.responseBodySize + sizes.responseHeadersSize;
+    } catch {
+      /* the page moved on; the count above still fails the budget check */
+    }
+  };
+  page.on("requestfinished", onScript);
   const res = await page.goto("/h/bodija-heights", { waitUntil: "networkidle" });
   expect(res?.headers()["x-lite"]).toBe("1");
   await expect(page.locator('[data-template="essentials"]')).toBeVisible();
@@ -95,6 +100,8 @@ test("Essentials stays inside its JavaScript budget", async ({ page }) => {
   console.log(`Essentials home: ${(js / 1024).toFixed(1)} KB of script files (${scripts.length}), ${(inline / 1024).toFixed(1)} KB inline`);
   expect(js + inline).toBeLessThan(ESSENTIALS_BUDGET);
   expect(await page.locator("script[src]").count()).toBe(0);
+  expect(scripts).toEqual([]);
+  page.off("requestfinished", onScript);
   // It still works without the framework: the theme switch flips, and a room's link opens the booking page.
   const before = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.locator("[data-lite-theme]").click();

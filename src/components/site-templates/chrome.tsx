@@ -81,7 +81,7 @@ export function SiteHeader(p: ChromeProps) {
             </Link>
             <div className="flex items-center justify-end gap-1 md:col-start-3">
               <ThemeToggle className="!text-current max-sm:hidden" />
-              <Link href={book} className="boutique-reserve ml-1 inline-flex h-10 items-center border border-current px-4 text-[0.75rem] uppercase tracking-[0.2em]">
+              <Link href={book} data-testid="site-book" className="boutique-reserve ml-1 inline-flex h-10 items-center border border-current px-4 text-[0.75rem] uppercase tracking-[0.2em]">
                 {p.book?.label ?? "Reserve"}
               </Link>
             </div>
@@ -129,7 +129,7 @@ export function SiteHeader(p: ChromeProps) {
             </nav>
             <div className="flex items-center gap-1">
               <ThemeToggle />
-              <Link href={book} className="btn btn-primary ml-1 !min-h-9 !rounded-none !px-4 text-sm">
+              <Link href={book} data-testid="site-book" className="btn btn-primary ml-1 !min-h-9 !rounded-none !px-4 text-sm">
                 {p.book?.label ?? "Book now"}
               </Link>
             </div>
@@ -170,7 +170,7 @@ export function SiteHeader(p: ChromeProps) {
               </nav>
               <div className="flex items-center gap-1">
                 <ThemeToggle className="!rounded-full max-sm:hidden" />
-                <Link href={book} className="btn btn-primary !min-h-11 !rounded-full !px-5 text-sm">
+                <Link href={book} data-testid="site-book" className="btn btn-primary !min-h-11 !rounded-full !px-5 text-sm">
                   {p.book?.label ?? "Book your stay"}
                 </Link>
               </div>
@@ -207,7 +207,7 @@ export function SiteHeader(p: ChromeProps) {
                   ))}
                   {groupLink}
                   <li>
-                    <Link href={book} className="heritage-book inline-flex h-9 items-center border border-laterite px-4 text-laterite transition-colors hover:bg-laterite hover:text-laterite-ink">
+                    <Link href={book} data-testid="site-book" className="heritage-book inline-flex h-9 items-center border border-laterite px-4 text-laterite transition-colors hover:bg-laterite hover:text-laterite-ink">
                       {p.book?.label ?? "Reservations"}
                     </Link>
                   </li>
@@ -238,7 +238,7 @@ export function SiteHeader(p: ChromeProps) {
                   <Phone size={16} aria-hidden /> <span className="max-sm:sr-only">Call</span>
                 </a>
               ) : null}
-              <a href={book} className="lite-btn lite-btn-primary">
+              <a href={book} data-testid="site-book" className="lite-btn lite-btn-primary">
                 {p.book?.label ?? "Book"}
               </a>
             </div>
@@ -277,7 +277,7 @@ export function SiteHeader(p: ChromeProps) {
                 </a>
               ) : null}
               <ThemeToggle />
-              <Link href={book} className="btn btn-primary ml-1 !min-h-10 !px-4 text-sm">
+              <Link href={book} data-testid="site-book" className="btn btn-primary ml-1 !min-h-10 !px-4 text-sm">
                 {p.book?.label ?? "Book a room"}
               </Link>
             </div>
