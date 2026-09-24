@@ -74,7 +74,7 @@ export default async function DevelopersOverview() {
           <p className="mt-3 text-sm text-ink-muted">
             Keys are made by a hotel&rsquo;s owner in the hotel admin, under{" "}
             <a href={ADMIN_KEYS_URL} className="link-static text-ink">
-              Settings, API keys
+              Developers, API keys
             </a>
             .
           </p>

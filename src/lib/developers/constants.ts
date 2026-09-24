@@ -10,8 +10,10 @@ const PUBLIC_API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").
 export const PARTNER_BASE_URL = (process.env.NEXT_PUBLIC_PARTNER_API_URL || `${PUBLIC_API}/api/partner/v1`).replace(/\/$/, "");
 
 /** Where a hotel's owner creates keys and webhook endpoints in the hotel admin. */
-export const ADMIN_KEYS_URL = `${ADMIN_URL}/settings/api-keys`;
-export const ADMIN_WEBHOOKS_URL = `${ADMIN_URL}/settings/webhooks`;
+export const ADMIN_KEYS_URL = `${ADMIN_URL}/developers/api-keys`;
+export const ADMIN_WEBHOOKS_URL = `${ADMIN_URL}/developers/webhooks`;
+/** How the hotel admin labels that area in its navigation. */
+export const ADMIN_AREA = "Developers";
 
 export const DOCS_TITLE = `${APP_NAME} for developers`;
 

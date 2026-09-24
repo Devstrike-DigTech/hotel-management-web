@@ -34,7 +34,7 @@ export default async function GettingStarted() {
       </p>
       <ul>
         <li>
-          A hotel on the Enterprise plan (or with the API add-on), and a person there who can open <strong>Settings, API keys</strong> in
+          A hotel on the Enterprise plan (or with the API add-on), and a person there who can open <strong>Developers, API keys</strong> in
           the {APP_NAME} hotel admin.
         </li>
         <li>A terminal with curl, or Node 18 or later, or Python 3 with <code>requests</code>.</li>
@@ -46,7 +46,7 @@ export default async function GettingStarted() {
           <p>
             Sign in to the hotel admin and go to{" "}
             <a href={ADMIN_KEYS_URL} className="text-ink">
-              Settings, API keys
+              Developers, API keys
             </a>
             . Choose <strong>New key</strong>.
           </p>

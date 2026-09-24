@@ -67,7 +67,10 @@ export interface OperationView {
   id: string;
   method: HttpMethod;
   path: string;
+  /** The summary as a title ("Create a reservation"). */
   summary: string;
+  /** A trailing parenthetical of the spec's summary ("NIGHTLY, CONFIRMED, source API"), shown as a note. */
+  summaryNote?: string;
   description?: string;
   deprecated: boolean;
   group: string;
@@ -267,6 +270,17 @@ const ID_PREFIX: Record<string, string> = {
   flag: "flg",
 };
 
+/** A stable, different-looking UUID per field name, so ids in one example do not all read the same. */
+function uuidFor(name: string) {
+  let h = 2166136261;
+  for (const c of name || "id") h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  const hex = (n: number, len: number) => (n >>> 0).toString(16).padStart(8, "0").slice(0, len);
+  const a = h;
+  const b = Math.imul(h, 2654435761) >>> 0;
+  const c = Math.imul(b ^ 0x5bd1e995, 1540483477) >>> 0;
+  return `${hex(a, 8)}-${hex(b, 4)}-4${hex(b >>> 16, 3)}-a${hex(c, 3)}-${hex(c, 8)}${hex(a ^ c, 4)}`;
+}
+
 function exampleByName(name: string, s: Schema): unknown {
   const n = name.toLowerCase();
   if (s.type === "integer" || s.type === "number") {
@@ -282,7 +296,7 @@ function exampleByName(name: string, s: Schema): unknown {
   if (s.format === "date" || n.endsWith("date") || n === "checkin" || n === "checkout" || n === "from" || n === "to") return "2026-10-02";
   if (s.format === "email" || n.includes("email")) return "adaeze.okafor@example.ng";
   if (s.format === "uri" || s.format === "url" || n.endsWith("url")) return "https://example.ng/hooks/hotel";
-  if (s.format === "uuid") return "0b7f7d4e-2f5c-4c55-9d7e-3b1f8a6c2e10";
+  if (s.format === "uuid") return uuidFor(n);
   if (n.includes("phone")) return "+2348031234567";
   if (n === "cursor" || n.endsWith("cursor")) return "eyJpZCI6InJlc18wMUoifQ";
   if (n === "code" || n.endsWith("reference")) return "HMS-7K3Q9";
@@ -293,6 +307,11 @@ function exampleByName(name: string, s: Schema): unknown {
   }
   if (n.includes("name")) return n.includes("full") || n.includes("guest") ? "Adaeze Okafor" : "Deluxe King";
   if (n.includes("currency")) return "NGN";
+  if (n === "notes" || n === "note") return "Arriving late, around 22:00";
+  if (n === "reason") return "Guest changed plans";
+  if (n === "externalref" || n === "externalreference") return "PMS-48213";
+  if (n === "description") return "PMS bridge";
+  if (n === "status") return "ACTIVE";
   return "string";
 }
 
@@ -374,16 +393,89 @@ function jsonMedia(content: Record<string, MediaType> | undefined): [string, Med
   return entries.find(([k]) => k.includes("json")) ?? entries[0] ?? null;
 }
 
+/** "Scope: `rooms:read`" (or "Scopes: `a`, `b`") in a description. */
+const SCOPE_LINE = /^\s*Scopes?:\s*((?:`[a-z_]+:[a-z_]+`[\s,and]*)+)\.?\s*$/im;
+
 function scopesOf(doc: OpenApiDoc, op: Operation): string[] {
   const direct = op["x-required-scopes"] ?? op["x-scopes"];
   if (direct?.length) return direct;
   const sec = op.security ?? doc.security ?? [];
-  return [...new Set(sec.flatMap((r) => Object.values(r).flat()))];
+  const fromSecurity = [...new Set(sec.flatMap((r) => Object.values(r).flat()))];
+  if (fromSecurity.length) return fromSecurity;
+  const line = op.description ? SCOPE_LINE.exec(op.description) : null;
+  return line ? [...line[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]) : [];
 }
 
-function operationId(method: string, path: string, op: Operation) {
+/** The description without a scope line the reference already shows as a field. */
+function descriptionOf(op: Operation) {
+  const d = op.description?.replace(SCOPE_LINE, "").trim();
+  return d || undefined;
+}
+
+const singular = (w: string) => (w.endsWith("ies") ? `${w.slice(0, -3)}y` : w.endsWith("ses") ? w.slice(0, -2) : w.endsWith("s") ? w.slice(0, -1) : w);
+
+/**
+ * A readable, stable anchor when the spec has no operationId: "list-reservations",
+ * "get-reservation", "create-reservation", "update-reservation", "cancel-reservation",
+ * "get-reservation-folio", "set-rate-overrides", "delete-webhook-endpoint".
+ */
+function derivedId(method: HttpMethod, path: string) {
+  const segs = path.split("/").filter(Boolean);
+  const paramAt = segs.findIndex((x) => x.startsWith("{"));
+  const baseSegs = paramAt < 0 ? segs : segs.slice(0, paramAt);
+  // "rates/overrides" reads as "rate-overrides": every segment but the last in the singular.
+  const base = baseSegs.map((x, i) => (i < baseSegs.length - 1 ? singular(x) : x)).join("-");
+  const after = paramAt < 0 ? [] : segs.slice(paramAt + 1).filter((x) => !x.startsWith("{"));
+  const one = singular(base);
+  if (paramAt < 0) {
+    // A plural collection is listed; a singular resource (/me, /availability) is fetched.
+    const plural = /s$/.test(baseSegs[baseSegs.length - 1] ?? "");
+    const verb = { get: plural ? "list" : "get", post: "create", put: "set", patch: "update", delete: "delete" }[method];
+    return slugify(`${verb} ${method === "post" ? one : base}`);
+  }
+  if (after.length) {
+    const tail = after.join("-");
+    if (method === "get") return slugify(`get ${one} ${tail}`);
+    if (method === "patch" || method === "put") return slugify(`update ${one} ${tail}`);
+    return slugify(`${tail} ${one}`);
+  }
+  const verb = { get: "get", post: "create", put: "replace", patch: "update", delete: "delete" }[method];
+  return slugify(`${verb} ${one}`);
+}
+
+function operationId(method: HttpMethod, path: string, op: Operation) {
   if (op.operationId) return slugify(op.operationId.replace(/^[A-Za-z]+Controller_/, ""));
-  return slugify(`${method} ${path.replace(/[{}]/g, "")}`);
+  return derivedId(method, path);
+}
+
+/** "Create a reservation (NIGHTLY, CONFIRMED, source API)" -> the title and its note. */
+function splitSummary(summary: string): [string, string | undefined] {
+  const m = /^(.*\S)\s+\(([^()]+)\)\s*$/.exec(summary);
+  return m ? [m[1], m[2]] : [summary, undefined];
+}
+
+/** Group name for an operation without tags: its first path segment, in words ("room-types" -> "Room types"). */
+const GROUP_NAMES: Record<string, string> = { me: "Key", "webhook-endpoints": "Webhook endpoints", reports: "Reports" };
+
+/** What each group is for, when the spec's tags do not say. */
+const GROUP_NOTES: Record<string, string> = {
+  Key: "The key making the request: its scopes, properties and hotel.",
+  Properties: "The hotels a key can see: all of the group's, or only those it is restricted to.",
+  "Room types": "The kinds of room each property sells, with capacity and base price.",
+  Rooms: "Physical rooms and their housekeeping status, which a key with rooms:write can change.",
+  Availability: "Free, booked and blocked rooms per room type per night.",
+  Rates: "Resolved nightly rates with their restrictions, and overrides you can set for dates.",
+  Reservations: "List, read, create, modify and cancel bookings, and read their folios. Every write needs an Idempotency-Key.",
+  Guests: "Guest names and contact details. ID numbers, dates of birth and addresses are never returned.",
+  Housekeeping: "Cleaning and inspection tasks, which a key with housekeeping:write can complete.",
+  Reports: "Daily statistics per property: occupancy, rooms sold, ADR, RevPAR and revenue.",
+  "Webhook endpoints": "Manage where events are delivered, as in the hotel admin.",
+};
+function groupOf(path: string) {
+  const first = path.split("/").filter(Boolean)[0] ?? "general";
+  if (GROUP_NAMES[first]) return GROUP_NAMES[first];
+  const words = first.replace(/[-_]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export function buildReference(doc: OpenApiDoc, fallbackBase: string): ReferenceModel {
@@ -397,10 +489,10 @@ export function buildReference(doc: OpenApiDoc, fallbackBase: string): Reference
     for (const method of METHODS) {
       const op = item[method];
       if (!op) continue;
-      const tag = op.tags?.[0] ?? "General";
+      const tag = op.tags?.[0] ?? groupOf(path);
       if (!groups.has(tag)) {
         const meta = tagMeta.get(tag);
-        groups.set(tag, { slug: slugify(tag), name: meta?.["x-displayName"] ?? tag, description: meta?.description, operations: [] });
+        groups.set(tag, { slug: slugify(tag), name: meta?.["x-displayName"] ?? tag, description: meta?.description ?? GROUP_NOTES[tag], operations: [] });
         if (!order.includes(tag)) order.push(tag);
       }
       const own = (op.parameters ?? []).map((p) => deref<Parameter>(doc, p)).filter(Boolean) as Parameter[];
@@ -433,12 +525,14 @@ export function buildReference(doc: OpenApiDoc, fallbackBase: string): Reference
       while (usedIds.has(id)) id += "-2";
       usedIds.add(id);
 
+      const [title, note] = splitSummary(op.summary ?? `${method.toUpperCase()} ${path}`);
       groups.get(tag)!.operations.push({
         id,
         method,
         path,
-        summary: op.summary ?? `${method.toUpperCase()} ${path}`,
-        description: op.description,
+        summary: title,
+        summaryNote: note,
+        description: descriptionOf(op),
         deprecated: !!op.deprecated,
         group: slugify(tag),
         scopes: scopesOf(doc, op),

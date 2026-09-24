@@ -128,7 +128,7 @@ export default async function Webhooks() {
       <p>
         Add an endpoint in the hotel admin under{" "}
         <a href={ADMIN_WEBHOOKS_URL} className="text-ink">
-          Settings, Webhooks
+          Developers, Webhooks
         </a>{" "}
         (or with the <Link href="/developers/reference/webhook-endpoints">webhook endpoints API</Link>), choose the events it should
         receive, and copy its signing secret, which is shown once. From then on each event is sent as a <code>POST</code> with a

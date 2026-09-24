@@ -88,6 +88,7 @@ export function Operation({ op, baseUrl }: { op: OperationView; baseUrl: string 
               <PathText path={op.path} />
             </code>
           </p>
+          {op.summaryNote ? <p className="mt-2 font-mono text-xs uppercase tracking-[0.08em] text-ink-muted">{op.summaryNote}</p> : null}
           {op.deprecated ? <p className="mt-3 text-sm text-ochre">Deprecated. It keeps working in v1; prefer the replacement named below.</p> : null}
           <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <div className="flex items-center gap-2">
