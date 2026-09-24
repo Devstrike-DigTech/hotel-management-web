@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { clientIpFrom, stripTrustedHeaders, trustedProxyHeaders } from "./lib/server/client-ip";
+import { stripScripts } from "./lib/server/lite";
 
 /**
  * Multi-tenant host routing (Next 16 "proxy", formerly middleware; runs on Node.js).
@@ -18,6 +19,14 @@ import { clientIpFrom, stripTrustedHeaders, trustedProxyHeaders } from "./lib/se
  * also sets `x-site-host`, which the layout passes to the API so a white-labelled hotel's brand is
  * returned (M6). The developer docs (/developers) exist on the marketplace host only. Client copies of the trusted-proxy headers (X-Client-IP,
  * X-Proxy-Auth) are dropped on every route; only the server adds them, on its way to the backend.
+ *
+ * M7 on hotel sites:
+ *   ?preview=<token>   the draft theme and form (Brand Studio / Form Builder frames): passed on as
+ *                      `x-site-preview`, remembered for the visit in an httpOnly cookie, noindex, and
+ *                      frameable only by the admin's origin (CSP frame-ancestors). ?preview=off leaves.
+ *   every site page    `frame-ancestors 'self' <admin origin>`, so nobody else can frame the booking flow.
+ *   Essentials home    served without the framework's scripts (see lib/server/lite.ts).
+ *   ?template=<id>     development only: try a template on any hotel.
  */
 
 const APP_DOMAIN = (process.env.NEXT_PUBLIC_APP_DOMAIN || "hotelos.ng").toLowerCase();
@@ -110,29 +119,157 @@ async function resolveSite(host: string, clientIp: string | null): Promise<Site 
 }
 
 /** Headers only this proxy may set; a client's own copies are always dropped. */
-const SITE_HEADERS = ["x-site-base", "x-site-slug", "x-site-group", "x-site-host"];
+const SITE_HEADERS = ["x-site-base", "x-site-slug", "x-site-group", "x-site-host", "x-site-preview", "x-site-template"];
+
+/* ------------------------------------------------------------------ M7: preview, framing, Essentials */
+
+const DEV = process.env.NODE_ENV !== "production";
+const ADMIN_ORIGIN = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001").origin;
+  } catch {
+    return "http://localhost:3001";
+  }
+})();
+const PREVIEW_COOKIE = "site_preview";
+const TOKEN = /^[A-Za-z0-9._~-]{8,2048}$/;
+const TEMPLATES = new Set(["editorial", "boutique", "business", "resort", "heritage", "essentials"]);
+/** Marks the proxy's own request for the full page, so it is not served "lite" again. Per process. */
+const LITE_SECRET = crypto.randomUUID();
+
+interface Preview {
+  token: string | null;
+  /** Set the cookie to this token (arrived in the query). */
+  remember?: string;
+  /** Clear the cookie (?preview=off). */
+  forget?: boolean;
+}
+
+function previewOf(req: NextRequest): Preview {
+  const q = req.nextUrl.searchParams.get("preview");
+  if (q === "off" || q === "0" || q === "false") return { token: null, forget: true };
+  if (q && TOKEN.test(q)) return { token: q, remember: q };
+  const c = req.cookies.get(PREVIEW_COOKIE)?.value;
+  return { token: c && TOKEN.test(c) ? c : null };
+}
+
+function devTemplate(req: NextRequest) {
+  const t = DEV ? req.nextUrl.searchParams.get("template") : null;
+  return t && TEMPLATES.has(t) ? t : null;
+}
+
+/** Framing and indexing rules, and the preview cookie, on a hotel site's response. */
+function finish(req: NextRequest, res: NextResponse, preview: Preview) {
+  // Drafts only inside the admin's frames; the live site also in the admin (and itself), nowhere else.
+  res.headers.set("Content-Security-Policy", `frame-ancestors ${preview.token ? ADMIN_ORIGIN : `'self' ${ADMIN_ORIGIN}`}`);
+  if (preview.token) res.headers.set("X-Robots-Tag", "noindex, nofollow");
+  const secure = req.nextUrl.protocol === "https:";
+  if (preview.remember)
+    res.cookies.set(PREVIEW_COOKIE, preview.remember, { httpOnly: true, path: "/", maxAge: 30 * 60, sameSite: secure ? "none" : "lax", secure });
+  if (preview.forget) res.cookies.delete(PREVIEW_COOKIE);
+  return res;
+}
+
+const templates = new Map<string, { template: string | null; expires: number }>();
+
+function templateIn(raw: unknown): string | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const t = o.templateId ?? (o.template && typeof o.template === "object" ? (o.template as Record<string, unknown>).id : o.template);
+  return typeof t === "string" && TEMPLATES.has(t.toLowerCase()) ? t.toLowerCase() : null;
+}
+
+/** The hotel's published template, cached for a minute (only Essentials changes how the proxy serves). */
+async function publishedTemplate(slug: string, clientIp: string | null): Promise<string | null> {
+  const hit = templates.get(slug);
+  if (hit && hit.expires > Date.now()) return hit.template;
+  let template: string | null = null;
+  const theme = await apiGet<unknown>(`/public/hotels/${encodeURIComponent(slug)}/theme`, clientIp);
+  if (theme.ok) template = templateIn(theme.data);
+  else {
+    const detail = await apiGet<{ siteTheme?: unknown }>(`/public/hotels/${encodeURIComponent(slug)}`, clientIp);
+    if (detail.ok) template = templateIn(detail.data.siteTheme);
+    else if (detail.status === 0) return null; // API down: try again next time
+  }
+  templates.set(slug, { template, expires: Date.now() + 60_000 });
+  return template;
+}
+
+/** A page load of a document (not a router fetch, prefetch or asset). */
+function isDocument(req: NextRequest) {
+  return (
+    req.method === "GET" &&
+    !req.headers.get("rsc") &&
+    !req.headers.get("next-router-prefetch") &&
+    !req.headers.get("next-router-state-tree") &&
+    (req.headers.get("accept") ?? "").includes("text/html")
+  );
+}
+
+/** Where this server can reach itself (LITE_ORIGIN when behind something unusual). */
+function selfOrigin(req: NextRequest) {
+  if (process.env.LITE_ORIGIN) return process.env.LITE_ORIGIN.replace(/\/$/, "");
+  return `http://127.0.0.1:${process.env.PORT || req.nextUrl.port || "3000"}`;
+}
+
+/** The Essentials home without framework scripts, or null to serve it as usual. */
+async function liteHome(req: NextRequest, preview: Preview): Promise<NextResponse | null> {
+  const headers = new Headers();
+  req.headers.forEach((v, k) => {
+    if (!["host", "connection", "accept-encoding", "content-length", "x-lite-inner"].includes(k)) headers.set(k, v);
+  });
+  headers.set("x-forwarded-host", req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "");
+  headers.set("x-lite-inner", LITE_SECRET);
+  try {
+    const res = await fetch(`${selfOrigin(req)}${req.nextUrl.pathname}${req.nextUrl.search}`, { headers, redirect: "manual", signal: AbortSignal.timeout(15_000) });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return null;
+    const html = stripScripts(await res.text());
+    const out = new NextResponse(html, {
+      status: res.status,
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": res.headers.get("cache-control") ?? "private, no-cache", "x-lite": "1", vary: "Accept, Cookie" },
+    });
+    return finish(req, out, preview);
+  } catch {
+    return null;
+  }
+}
 
 function setSiteHost(headers: Headers, customHost: string | null) {
   if (customHost) headers.set("x-site-host", customHost);
   else headers.delete("x-site-host");
 }
 
-function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string, customHost: string | null = null) {
+async function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string, customHost: string | null = null) {
+  const preview = previewOf(req);
+  // M7: the Essentials home goes out without framework scripts (unless this is that very request).
+  if (rest === "/" && isDocument(req) && req.headers.get("x-lite-inner") !== LITE_SECRET) {
+    const template = devTemplate(req) ?? (preview.token ? null : await publishedTemplate(slug, clientIpFrom(req.headers)));
+    if (template === "essentials") {
+      const lite = await liteHome(req, preview);
+      if (lite) return lite;
+    }
+  }
   const url = req.nextUrl.clone();
   url.pathname = `/h/${slug}${rest === "/" ? "" : rest}`;
   const headers = new Headers(req.headers);
   stripTrustedHeaders(headers);
+  headers.delete("x-lite-inner");
   setSiteHost(headers, customHost);
+  if (preview.token) headers.set("x-site-preview", preview.token);
+  else headers.delete("x-site-preview");
+  const dev = devTemplate(req);
+  if (dev) headers.set("x-site-template", dev);
+  else headers.delete("x-site-template");
   headers.set("x-site-base", base);
   headers.set("x-site-slug", slug);
   // The group root this property is being shown under ("" when it has a host of its own).
   if (group !== undefined) headers.set("x-site-group", group);
   else headers.delete("x-site-group");
-  return NextResponse.rewrite(url, { request: { headers } });
+  return finish(req, NextResponse.rewrite(url, { request: { headers } }), preview);
 }
 
 /** A hotel group's root (the list of its hotels), its sitemap, robots and card. */
 function rewriteToGroup(req: NextRequest, group: string, base: string, rest: string, customHost: string | null = null) {
+  const preview = previewOf(req);
   const url = req.nextUrl.clone();
   url.pathname = `/g/${group}${rest === "/" ? "" : rest}`;
   const headers = new Headers(req.headers);
@@ -141,7 +278,12 @@ function rewriteToGroup(req: NextRequest, group: string, base: string, rest: str
   headers.set("x-site-base", base);
   headers.delete("x-site-slug");
   headers.delete("x-site-group");
-  return NextResponse.rewrite(url, { request: { headers } });
+  headers.delete("x-site-template");
+  if (preview.token) headers.set("x-site-preview", preview.token);
+  else headers.delete("x-site-preview");
+  const dev = devTemplate(req);
+  if (dev) headers.set("x-site-template", dev);
+  return finish(req, NextResponse.rewrite(url, { request: { headers } }), preview);
 }
 
 /** "/foo/bar" -> ["foo", "/bar"]; "/foo" -> ["foo", "/"]. */
