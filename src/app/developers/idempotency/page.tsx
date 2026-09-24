@@ -101,7 +101,8 @@ for attempt in range(4):
         <li>The key is saved in the same transaction as the write, so a replay is never half an action.</li>
       </ul>
       <Note>
-        Validation errors (<code>400</code>) are not stored, so you can fix the body and try again with the same key.
+        Only successful responses are stored. When a request fails, nothing was done and the key is released, so you can fix the
+        body and try again with the same key.
       </Note>
     </GuideFrame>
   );

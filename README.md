@@ -673,6 +673,26 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
 - The backend's own test run replaces the seeded custom domains (Lekki's `book.thepalmwinehouse.com` was gone and Ikoyi had a
   test domain at the time of the screenshots); the web simply follows `canonicalUrl`, whatever it is.
 
+## Contract notes (M6)
+
+- The partner API, its OpenAPI document (`info.version` 2026-09-24, `x-changelog`, `webhooks`), `resolve-host`'s `whiteLabel` and
+  `GET /public/hotels/:slug?host=` match `API-M6.md` against the live backend.
+- The OpenAPI document has no `tags` and no `operationId`s and states each scope as "Scope: `x`" in the description. The reference
+  groups operations by their first path segment, derives readable anchors from method and path (`create-reservation`,
+  `update-room-status`, `get-reservation-folio`) and reads the scope from the description; it would use tags, operationIds and
+  `security` scopes if the spec gained them.
+- The webhook events in the spec share one generic `Event` schema, so the catalogue describes each event's object in words (from
+  `API-M6.md` 14.2) rather than expanding a schema per event.
+- The white-label brand is attached per property: a custom domain always resolves as `kind: PROPERTY`, so a group root cannot be
+  served white-labelled on a custom domain today. The group root layout already asks its properties for a brand with the host and
+  will pick it up if the backend adds group domains.
+- The API's Google Fonts URLs request upright weights only; the web requests the heading font with its italics, which the display
+  role uses for accents.
+- The seeded Harmattan hotels take payment at the hotel only (`payOnlineAvailable: false`), so the dedicated-database test books
+  that way (it pays online through the mock checkout when a hotel offers it).
+- The spec's `info.description` points to "Settings > Integrations" in the hotel admin; the admin's area is "Developers" (API keys,
+  Webhooks), which the docs link to.
+
 ## Not done yet
 
 - Paystack Inline (the popup, using `accessCode`) is not used; the flow redirects to the hosted checkout, which
