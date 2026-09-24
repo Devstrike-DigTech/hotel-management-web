@@ -727,13 +727,19 @@ and the draft form. The proxy passes the token on as `x-site-preview` and rememb
 off. Framing: drafts are frameable only by the admin's origin (`Content-Security-Policy: frame-ancestors <admin origin>`); the live site
 only by itself and the admin. In a preview the booking page takes `?channel=MARKETPLACE` to show that channel's form.
 
+When a token shows no draft, the band says why instead of a vague failure: the link has **expired** (410; the admin should mint a
+new one), it is **for another hotel or for the booking form only** (404; a `kinds: ["FORM"]` token has no theme), or the API
+**could not be reached** (retried once). The band carries `data-preview-state` (`DRAFT`, `EXPIRED`, `NOT_FOUND`, `UNAVAILABLE`), and
+when framed the page posts `{ type: "site-preview", state, href }` to the admin's origin only, so the Brand Studio or Form Builder
+can fetch a fresh token and reload the frame.
+
 In development `?template=<id>` tries any layout on any hotel (ignored in production).
 
 ### Tests (M7)
 
 | Spec | What it proves |
 |---|---|
-| `m7.spec.ts` | Each template renders for its seeded hotel with its hero, rooms and a mark of its own layout (Boutique from the seeded draft through a preview token), keeping a full-page image; the group root is themed; the marketplace shows the hotel's mark without its template. The Essentials home transfers under 120 KB of script (it is served lite, with no script files) and still works: the theme switch and the date form. A booking on Palmwine Lekki's own site with the form's conditional question, an extra and a pickup from Jibowu Motor Park off a GIGM bus from Abuja, seen on review and on the confirmation card. Email not required to pay at the hotel, asked for before paying online. A preview token shows the draft with the banner, `noindex` and `frame-ancestors` for the admin only, while the live site is unchanged |
+| `m7.spec.ts` | Each template renders for its seeded hotel with its hero, rooms and a mark of its own layout (Boutique from the seeded draft through a preview token), keeping a full-page image; the group root is themed; the marketplace shows the hotel's mark without its template. The Essentials home transfers under 120 KB of script (it is served lite, with no script files) and still works: the theme switch and the date form. A booking on Palmwine Lekki's own site with the form's conditional question, an extra and a pickup from Jibowu Motor Park off a GIGM bus from Abuja, seen on review and on the confirmation card. Email not required to pay at the hotel, asked for before paying online. A preview token shows the draft with the banner, `noindex` and `frame-ancestors` for the admin only, while the live site is unchanged. Tokens minted exactly as the admin mints them (`POST /site/preview-token {}`, its `urls.site` with `&v=`, `urls.booking` with `&channel=`) framed from the running admin's origin show the draft and post `DRAFT` to the parent; a form-only or forged token says why; the marketplace's origin cannot frame a draft |
 
 Earlier specs fill any required question a seeded form adds and pass the extras step (`fillRequiredAnswers`, `passAddOnsStep`).
 

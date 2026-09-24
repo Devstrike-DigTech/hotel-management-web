@@ -89,7 +89,7 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
     >
       {theme.templateId === "essentials" ? <LiteScript /> : null}
       {fonts.length ? <BrandFonts hrefs={fonts} /> : null}
-      {token ? <PreviewBanner draft={theme.draft} /> : null}
+      {token ? <PreviewBanner draft={theme.draft} problem={theme.previewProblem ?? null} /> : null}
       <SiteHeader {...chrome} />
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">

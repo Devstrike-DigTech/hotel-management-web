@@ -122,7 +122,7 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
       ) : fonts.length ? (
         <BrandFonts hrefs={fonts} />
       ) : null}
-      {token ? <PreviewBanner draft={theme.draft} /> : null}
+      {token ? <PreviewBanner draft={theme.draft} problem={theme.previewProblem ?? null} /> : null}
       <SiteHeader {...chrome} />
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">

@@ -256,3 +256,75 @@ test("a preview token shows the draft theme with a banner, noindex and admin-onl
   await page.goto(`/h/palmwine-house/book?preview=${token}`);
   await expect(page.getByTestId("preview-banner")).toBeVisible();
 });
+
+/** A token minted exactly as the admin's Brand Studio and Form Builder mint it: `POST /site/preview-token {}`. */
+async function adminPreview(request: APIRequestContext, body: Record<string, unknown> = {}) {
+  const staff = { authorization: `Bearer ${await staffToken(request)}` };
+  const res = await request.post(`${API}/site/preview-token`, { headers: staff, data: body });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  return (await res.json()) as { token: string; urls: { site: string; booking: string } };
+}
+
+/**
+ * Frames `src` from a page on `origin` (the admin's by default, which must be running as in the full
+ * stack), the way the Brand Studio does, and collects what the frame tells its parent.
+ */
+async function frameFromAdmin(page: Page, src: string, host = `${ADMIN_ORIGIN}/login`) {
+  await page.goto(host, { waitUntil: "networkidle" });
+  await page.evaluate((s) => {
+    const w = window as unknown as { __msgs: unknown[] };
+    w.__msgs = [];
+    addEventListener("message", (e) => w.__msgs.push({ origin: e.origin, data: e.data }));
+    document.querySelectorAll("iframe[data-e2e]").forEach((f) => f.remove());
+    const f = document.createElement("iframe");
+    f.dataset.e2e = "";
+    f.id = "e2e-frame";
+    f.src = s;
+    f.width = "1280";
+    f.height = "800";
+    document.body.appendChild(f);
+  }, src);
+  return page.frameLocator("#e2e-frame");
+}
+
+test("the admin's own preview links show the draft inside its frame, and say why when they cannot", async ({ page, request }) => {
+  // The seeded Boutique draft (put back if another suite published or discarded it).
+  const staff = { authorization: `Bearer ${await staffToken(request)}` };
+  const state = (await (await request.get(`${API}/site/theme`, { headers: staff })).json()) as { draft: { templateId: string } };
+  if (state.draft.templateId !== "boutique")
+    await request.put(`${API}/site/theme/draft`, { headers: { ...staff, "idempotency-key": `web-e2e-${Date.now()}` }, data: { templateId: "boutique", brand: { fontPairingId: "cormorant-manrope" } } });
+
+  // Brand Studio: urls.site with the version counter the admin appends.
+  const { urls } = await adminPreview(request);
+  let frame = await frameFromAdmin(page, `${urls.site}&v=3`);
+  await expect(frame.getByTestId("preview-banner")).toHaveAttribute("data-preview-state", "DRAFT");
+  await expect(frame.locator('.brand-scope[data-template="boutique"]')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __msgs: { data: { type: string; state: string } }[] }).__msgs.map((m) => m.data.state))).toContain("DRAFT");
+
+  // Form Builder: urls.booking with the channel it previews.
+  frame = await frameFromAdmin(page, `${urls.booking}&channel=MARKETPLACE`);
+  await expect(frame.getByTestId("preview-banner")).toBeVisible();
+  await expect(frame.getByTestId("room-option").first()).toBeVisible();
+  await expect(frame.getByText("Draft preview of the booking form")).toBeVisible();
+
+  // A token without the theme (booking form only) on the site: the published site, and the reason.
+  const formOnly = await adminPreview(request, { kinds: ["FORM"] });
+  frame = await frameFromAdmin(page, formOnly.urls.site);
+  await expect(frame.getByTestId("preview-banner")).toHaveAttribute("data-preview-state", "NOT_FOUND");
+  await expect(frame.getByTestId("preview-banner")).toContainText("booking form only");
+
+  // A tampered or foreign token: never the draft.
+  frame = await frameFromAdmin(page, `${urls.site.replace(/preview=[^&]+/, "preview=eyJ0aWQiOiJ4In0.forged-signature")}`);
+  await expect(frame.getByTestId("preview-banner")).toHaveAttribute("data-preview-state", "NOT_FOUND");
+  await expect(frame.locator('.brand-scope[data-template="boutique"]')).toHaveCount(0);
+});
+
+test("a draft preview cannot be framed by any other origin", async ({ page, request, baseURL }) => {
+  const { urls } = await adminPreview(request);
+  const res = await request.get(urls.site);
+  expect(res.headers()["content-security-policy"]).toBe(`frame-ancestors ${ADMIN_ORIGIN}`);
+  // The marketplace's own origin is not the admin's: the draft refuses to render in its frame.
+  const frame = await frameFromAdmin(page, urls.site, `${baseURL}/pricing`);
+  await page.waitForTimeout(3000);
+  await expect(frame.getByTestId("preview-banner")).toHaveCount(0);
+});

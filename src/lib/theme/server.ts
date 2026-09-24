@@ -39,12 +39,14 @@ async function resolveTheme(hotel: HotelDetail): Promise<SiteTheme> {
   const token = await previewToken();
   const host = (await headers()).get("x-site-host");
   const ctx = { accentColor: hotel.branding.accentColor, logoUrl: hotel.branding.logoUrl };
+  let problem: SiteTheme["previewProblem"] = null;
   if (token) {
-    const draft = await api.siteTheme(hotel.slug, { preview: token, host }).catch(() => null);
-    if (draft) return normaliseTheme(draft, ctx);
+    const draft = await api.previewTheme("hotels", hotel.slug, token, host);
+    if (draft.theme) return normaliseTheme(draft.theme, { ...ctx, draft: true });
+    problem = draft.problem;
   }
   const raw = hotel.siteTheme ?? (await api.siteTheme(hotel.slug, { host }).catch(() => null));
-  const theme = normaliseTheme(raw, ctx);
+  const theme: SiteTheme = { ...normaliseTheme(raw, ctx), previewProblem: problem };
   const dev = await devTemplate();
   if (dev && dev !== theme.templateId) return normaliseTheme({ ...(raw ?? {}), templateId: dev, sections: undefined, fontPairing: undefined }, ctx);
   return theme;
@@ -55,11 +57,13 @@ export const getGroupTheme = cache(async (group: HotelGroup): Promise<SiteTheme>
   const token = await previewToken();
   const host = (await headers()).get("x-site-host");
   const ctx = { accentColor: group.branding.accentColor, logoUrl: group.branding.logoUrl };
+  let problem: SiteTheme["previewProblem"] = null;
   if (token) {
-    const draft = await api.groupTheme(group.slug, { preview: token, host }).catch(() => null);
-    if (draft) return normaliseTheme(draft, ctx);
+    const draft = await api.previewTheme("groups", group.slug, token, host);
+    if (draft.theme) return normaliseTheme(draft.theme, { ...ctx, draft: true });
+    problem = draft.problem;
   }
   const raw = group.siteTheme ?? (await api.groupTheme(group.slug, { host }).catch(() => null));
   const dev = await devTemplate();
-  return normaliseTheme(dev ? { ...(raw ?? {}), templateId: dev, sections: undefined, fontPairing: undefined } : raw, ctx);
+  return { ...normaliseTheme(dev ? { ...(raw ?? {}), templateId: dev, sections: undefined, fontPairing: undefined } : raw, ctx), previewProblem: problem };
 });

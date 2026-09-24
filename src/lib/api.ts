@@ -18,6 +18,9 @@ import type {
   ResolvedHost,
 } from "./types";
 
+/** Why a preview token shows the published site instead of a draft. */
+export type PreviewProblem = "EXPIRED" | "NOT_FOUND" | "UNAVAILABLE";
+
 /** Typed client for the public API. Server-only: pages fetch on the server for SEO. */
 
 export class ApiError extends Error {
@@ -149,6 +152,25 @@ export const api = {
       if (err instanceof ApiError && [400, 401, 403, 404, 410].includes(err.status)) return null;
       throw err;
     }
+  },
+  /**
+   * M7: the draft theme behind a preview token, with the reason when there is none: the token expired
+   * (410), is not for this hotel or carries no theme (404), or the API could not be reached (retried once).
+   */
+  previewTheme: async (kind: "hotels" | "groups", slug: string, token: string, host?: string | null): Promise<{ theme: Record<string, unknown> | null; problem: PreviewProblem | null }> => {
+    const path = `/public/${kind}/${encodeURIComponent(slug)}/theme${qs({ preview: token, host })}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return { theme: await request<Record<string, unknown>>(path, { revalidate: false, timeoutMs: 6000 }), problem: null };
+      } catch (err) {
+        const e = err instanceof ApiError ? err : new ApiError(0, null, String(err));
+        if (e.status === 410 || e.code === "PREVIEW_EXPIRED") return { theme: null, problem: "EXPIRED" };
+        if (e.status === 404 || e.status === 401 || e.status === 403) return { theme: null, problem: "NOT_FOUND" };
+        if (attempt === 1) return { theme: null, problem: "UNAVAILABLE" };
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+    return { theme: null, problem: "UNAVAILABLE" };
   },
   /** M7: a hotel group root's theme (the primary property's when the group has none). */
   groupTheme: async (slug: string, opts: { preview?: string | null; host?: string | null } = {}): Promise<Record<string, unknown> | null> => {

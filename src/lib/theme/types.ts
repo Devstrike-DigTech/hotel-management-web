@@ -131,6 +131,8 @@ export interface SiteTheme {
   pickupPoints: PickupPoint[];
   /** True when this is an unpublished draft shown through a preview token. */
   draft: boolean;
+  /** With a preview token but no draft: why (expired, not for this hotel or without a theme, API unreachable). */
+  previewProblem?: "EXPIRED" | "NOT_FOUND" | "UNAVAILABLE" | null;
   /** True when the hotel has never published a theme and these are the template's defaults. */
   fallback: boolean;
   publishedAt: string | null;
