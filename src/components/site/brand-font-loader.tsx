@@ -9,9 +9,11 @@ import { useEffect } from "react";
  * (the server already asked the browser to preload them).
  */
 export function BrandFontLoader({ hrefs }: { hrefs: string[] }) {
+  // Keyed on the URLs, not the array, so navigating within the site never re-attaches the stylesheets.
+  const key = hrefs.join("\n");
   useEffect(() => {
     const added: HTMLLinkElement[] = [];
-    for (const href of hrefs) {
+    for (const href of key.split("\n").filter(Boolean)) {
       if (document.querySelector(`link[rel="stylesheet"][href="${CSS.escape(href)}"]`)) continue;
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -21,6 +23,6 @@ export function BrandFontLoader({ hrefs }: { hrefs: string[] }) {
       added.push(link);
     }
     return () => added.forEach((l) => l.remove());
-  }, [hrefs]);
+  }, [key]);
   return null;
 }
