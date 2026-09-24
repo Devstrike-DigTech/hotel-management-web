@@ -1,25 +1,22 @@
-import { preconnect } from "react-dom";
+import { preconnect, preload } from "react-dom";
 import { ArrowUpRight } from "@phosphor-icons/react/ssr";
 import { KeyFob } from "@/components/ui/wordmark";
+import { BrandFontLoader } from "./brand-font-loader";
 import { APP_NAME, SITE_URL } from "@/lib/env";
 import { safeFooterLinks } from "@/lib/white-label";
 import type { PublicWhiteLabel } from "@/lib/types";
 
 /**
- * Loads a white-labelled hotel's chosen Google fonts. React hoists the stylesheets into <head> and
- * dedupes them; `display=swap` keeps text visible (in the house fonts) while they arrive.
+ * Loads a white-labelled hotel's chosen Google fonts without ever blocking the page: the server
+ * emits preconnect and preload hints so the CSS is fetched early, and a client component attaches
+ * the stylesheets after hydration. `display=swap` keeps text readable in the house fonts meanwhile.
  */
 export function BrandFonts({ hrefs }: { hrefs: string[] }) {
   if (!hrefs.length) return null;
   preconnect("https://fonts.googleapis.com");
   preconnect("https://fonts.gstatic.com", { crossOrigin: "anonymous" });
-  return (
-    <>
-      {hrefs.map((href) => (
-        <link key={href} rel="stylesheet" href={href} precedence="brand" />
-      ))}
-    </>
-  );
+  for (const href of hrefs) preload(href, { as: "style" });
+  return <BrandFontLoader hrefs={hrefs} />;
 }
 
 /** The platform credit in a hotel's footer. Never rendered for a white-labelled hotel that hides it. */
