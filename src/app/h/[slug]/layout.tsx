@@ -3,9 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Phone } from "@phosphor-icons/react/ssr";
 import { BrandFonts, FooterLinks, PoweredBy } from "@/components/site/brand-kit";
+import { SiteLogo } from "@/components/site/site-logo";
 import { SiteLinksProvider } from "@/components/site/site-links";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Monogram } from "@/components/ui/monogram";
 import { brandStyle } from "@/lib/brand";
 import { APP_DOMAIN, SITE_URL } from "@/lib/env";
 import { formatPhone, toE164Digits } from "@/lib/format";
@@ -79,12 +79,7 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-[6px]">
         <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
           <Link href={home} className="-m-1 flex min-w-0 items-center gap-3 rounded-sm p-1">
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element -- hotel logos live on arbitrary hosts
-              <img src={logo} alt="" className="h-10 w-auto max-w-[8rem] object-contain" data-testid="site-logo" />
-            ) : (
-              <Monogram name={hotel.name} />
-            )}
+            <SiteLogo src={logo} name={hotel.name} />
             <span className="min-w-0">
               <span className="display-sm block truncate text-lg leading-tight">{hotel.name}</span>
               <span className="kicker block truncate !text-[10px]">

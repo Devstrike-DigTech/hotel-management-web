@@ -24,10 +24,19 @@ export function safeFamily(font: FontChoice | null | undefined): string | null {
   return family && FAMILY.test(family) ? family : null;
 }
 
-/** The stylesheet URL for a font: the API's Google Fonts URL when it really is one, else built here. */
-export function fontHref(font: FontChoice): string | null {
+/**
+ * The stylesheet URL for a font: the API's Google Fonts URL when it really is one, else built here.
+ * `italics` asks for the italic cut too (the display role sets its accents in italic), so the browser
+ * does not have to slant the upright.
+ */
+export function fontHref(font: FontChoice, italics = false): string | null {
   const family = safeFamily(font);
   if (!family) return null;
+  const weights = [...new Set((font.weights ?? []).filter((w) => Number.isInteger(w) && w >= 100 && w <= 900))].sort((a, b) => a - b);
+  if (italics && weights.length) {
+    const axis = `ital,wght@${[...weights.map((w) => `0,${w}`), ...weights.map((w) => `1,${w}`)].join(";")}`;
+    return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}:${axis}&display=swap`;
+  }
   try {
     const u = new URL(font.googleFontsUrl);
     if (u.protocol === "https:" && u.hostname === "fonts.googleapis.com") {
@@ -37,7 +46,6 @@ export function fontHref(font: FontChoice): string | null {
   } catch {
     /* build our own below */
   }
-  const weights = [...new Set((font.weights ?? []).filter((w) => Number.isInteger(w) && w >= 100 && w <= 900))].sort((a, b) => a - b);
   const axis = weights.length ? `:wght@${weights.join(";")}` : "";
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}${axis}&display=swap`;
 }
@@ -71,7 +79,7 @@ export function whiteLabelTheme(wl: PublicWhiteLabel, fallbackAccent?: string | 
   if (heading) {
     style["--font-fraunces"] = stack(heading);
     style["--font-display"] = stack(heading);
-    const href = fontHref(heading);
+    const href = fontHref(heading, true);
     if (href) fonts.push(href);
   }
   const body = wl.bodyFont && safeFamily(wl.bodyFont) && wl.bodyFont.category !== "display" ? wl.bodyFont : null;

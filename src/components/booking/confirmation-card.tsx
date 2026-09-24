@@ -84,7 +84,7 @@ export function ConfirmationCard({ data, appName, shareUrl }: { data: Confirmati
     >
       {/* Letterhead */}
       <header className="relative px-5 pb-6 pt-6 sm:px-10 sm:pt-9">
-        <Stamp {...stamp} tone={stampTone} className="pointer-events-none absolute right-3 top-4 w-[5.75rem] sm:hidden" />
+        <Stamp {...stamp} tone={stampTone} initials={appName ? undefined : initialsOf(data.hotel.name)} className="pointer-events-none absolute right-3 top-4 w-[5.75rem] sm:hidden" />
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 max-sm:pr-24">
             <p className="kicker">
@@ -174,7 +174,7 @@ export function ConfirmationCard({ data, appName, shareUrl }: { data: Confirmati
         </dl>
         {data.cancellationNote ? <p className="mt-5 max-w-lg text-xs leading-relaxed text-ink-muted">{data.cancellationNote}</p> : null}
         </div>
-        <Stamp {...stamp} tone={stampTone} className="pointer-events-none hidden w-full sm:block" />
+        <Stamp {...stamp} tone={stampTone} initials={appName ? undefined : initialsOf(data.hotel.name)} className="pointer-events-none hidden w-full sm:block" />
       </section>
 
       <Perforation />
@@ -222,8 +222,11 @@ function LedgerRow({ label, value, tone = "", muted, testId }: { label: string; 
   );
 }
 
-/** An inked rubber stamp: two lines set on the ring, the key fob in the middle, pressed on at an angle. */
-export function Stamp({ top, bottom, tone, className = "" }: { top: string; bottom: string; tone: string; className?: string }) {
+/**
+ * An inked rubber stamp: two lines set on the ring, the key fob in the middle, pressed on at an angle.
+ * A white-labelled hotel's stamp carries its own initials in place of the platform's fob.
+ */
+export function Stamp({ top, bottom, tone, className = "", initials }: { top: string; bottom: string; tone: string; className?: string; initials?: string }) {
   const id = `stamp${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <div className={`stamp ${className}`} style={{ color: tone }} aria-hidden>
@@ -254,14 +257,31 @@ export function Stamp({ top, bottom, tone, className = "" }: { top: string; bott
           </text>
           <circle cx="24" cy="70" r="1.8" fill="currentColor" />
           <circle cx="116" cy="70" r="1.8" fill="currentColor" />
-          <path d="M70 47 83 57v26L70 93 57 83V57z" fill="currentColor" />
-          <circle cx="70" cy="56" r="3.2" fill="var(--surface)" />
-          <path d="M62.5 67h15M62.5 73h15M62.5 79h9" stroke="var(--surface)" strokeWidth="1.3" opacity=".75" />
+          {initials ? (
+            <text x="70" y="71" fill="currentColor" textAnchor="middle" dominantBaseline="central" style={{ font: "italic 400 27px var(--font-display), Georgia, serif" }}>
+              {initials}
+            </text>
+          ) : (
+            <>
+              <path d="M70 47 83 57v26L70 93 57 83V57z" fill="currentColor" />
+              <circle cx="70" cy="56" r="3.2" fill="var(--surface)" />
+              <path d="M62.5 67h15M62.5 73h15M62.5 79h9" stroke="var(--surface)" strokeWidth="1.3" opacity=".75" />
+            </>
+          )}
         </g>
       </svg>
     </div>
   );
 }
+
+const initialsOf = (name: string) =>
+  name
+    .replace(/^the\s+/i, "")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
 
 function Perforation() {
   return (

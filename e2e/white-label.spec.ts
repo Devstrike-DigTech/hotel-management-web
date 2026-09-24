@@ -120,7 +120,8 @@ test("booking on the white-labelled domain stays on it from the room to managing
   const manage = page.getByTestId("manage-link");
   await expect(manage).toHaveAttribute("href", /^\/trips\/[A-Z0-9-]+\?t=/);
   await manage.click();
-  await expect(page).toHaveURL(new RegExp(`^http://${DOMAIN.replace(/\./g, "\\.")}:${port}/trips/`));
+  // The first visit compiles the route in development, hence the longer wait.
+  await expect(page).toHaveURL(new RegExp(`^http://${DOMAIN.replace(/\./g, "\\.")}:${port}/trips/`), { timeout: 60_000 });
   await expect(page.getByTestId("documents").or(page.getByText("Cancel this booking")).first()).toBeVisible();
   await expectNoPlatform(page);
 });

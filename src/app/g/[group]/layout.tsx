@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SiteLogo } from "@/components/site/site-logo";
 import { BrandFonts, FooterLinks, PoweredBy } from "@/components/site/brand-kit";
-import { Monogram } from "@/components/ui/monogram";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { brandStyle } from "@/lib/brand";
 import { canonicalGroup, getGroup, getGroupWhiteLabel, groupBase } from "@/lib/site";
@@ -57,12 +57,7 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-[6px]">
         <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
           <Link href={home} className="-m-1 flex min-w-0 items-center gap-3 rounded-sm p-1">
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element -- hotel logos live on arbitrary hosts
-              <img src={logo} alt="" className="h-10 w-auto max-w-[8rem] object-contain" data-testid="site-logo" />
-            ) : (
-              <Monogram name={group.name} />
-            )}
+            <SiteLogo src={logo} name={group.name} />
             <span className="min-w-0">
               <span className="display-sm block truncate text-lg leading-tight">{group.name}</span>
               <span className="kicker block truncate !text-[10px]">
