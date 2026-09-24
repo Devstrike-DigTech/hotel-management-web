@@ -8,6 +8,9 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  /* The house fonts, captured where next/font defines them, so a hotel's own font can fall back to them. */
+  --house-display: var(--font-fraunces);
+  --house-sans: var(--font-schibsted);
   --paper: #f4efe6;
   --surface: #fbf8f2;
   --surface-2: #ede6da;

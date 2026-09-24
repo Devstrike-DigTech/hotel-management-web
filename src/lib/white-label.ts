@@ -50,7 +50,12 @@ export function fontHref(font: FontChoice, italics = false): string | null {
   return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}${axis}&display=swap`;
 }
 
-const stack = (font: FontChoice) => `"${safeFamily(font)}", ${FALLBACK[font.category] ?? FALLBACK.serif}`;
+/**
+ * The hotel's font first, then the house font for the same role (so text never drops to a system
+ * face while the hotel's font loads, or if it cannot), then a generic of the right kind.
+ */
+const stack = (font: FontChoice, role: "display" | "sans") =>
+  `"${safeFamily(font)}", var(--house-${role}), ${FALLBACK[font.category] ?? FALLBACK.serif}`;
 
 export interface WhiteLabelTheme {
   style: React.CSSProperties;
@@ -77,15 +82,15 @@ export function whiteLabelTheme(wl: PublicWhiteLabel, fallbackAccent?: string | 
   const fonts: string[] = [];
   const heading = wl.headingFont && safeFamily(wl.headingFont) ? wl.headingFont : null;
   if (heading) {
-    style["--font-fraunces"] = stack(heading);
-    style["--font-display"] = stack(heading);
+    style["--font-fraunces"] = stack(heading, "display");
+    style["--font-display"] = stack(heading, "display");
     const href = fontHref(heading, true);
     if (href) fonts.push(href);
   }
   const body = wl.bodyFont && safeFamily(wl.bodyFont) && wl.bodyFont.category !== "display" ? wl.bodyFont : null;
   if (body) {
-    style["--font-schibsted"] = stack(body);
-    style["--font-sans"] = stack(body);
+    style["--font-schibsted"] = stack(body, "sans");
+    style["--font-sans"] = stack(body, "sans");
     const href = fontHref(body);
     if (href && !fonts.includes(href)) fonts.push(href);
   }
