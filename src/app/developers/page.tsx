@@ -42,7 +42,7 @@ export default async function DevelopersOverview() {
   return (
     <div className="pb-20">
       <section className="grid gap-10 border-b border-line pb-14 pt-12 sm:pt-16 xl:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] xl:items-end">
-        <div>
+        <div className="min-w-0">
           <p className="kicker fade-up">
             The partner API <span className="text-line-strong">/</span> Version 1 <span className="text-line-strong">/</span> Enterprise
           </p>
@@ -69,7 +69,7 @@ export default async function DevelopersOverview() {
             </Link>
           </div>
         </div>
-        <div className="fade-up [--d:300ms]">
+        <div className="fade-up min-w-0 [--d:300ms]">
           <CodeBlock code={curl} lang="bash" title="Your first request" />
           <p className="mt-3 text-sm text-ink-muted">
             Keys are made by a hotel&rsquo;s owner in the hotel admin, under{" "}

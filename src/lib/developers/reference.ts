@@ -246,6 +246,27 @@ export function schemaNode(doc: OpenApiDoc, input: Schema | Ref | undefined, see
  *  Examples
  * ------------------------------------------------------------------ */
 
+const ID_PREFIX: Record<string, string> = {
+  reservation: "res",
+  property: "prp",
+  roomtype: "rmt",
+  room: "rm",
+  rateplan: "rpl",
+  guest: "gst",
+  folio: "fol",
+  entry: "ent",
+  task: "hkt",
+  housekeepingtask: "hkt",
+  webhookendpoint: "whe",
+  endpoint: "whe",
+  key: "key",
+  tenant: "tnt",
+  event: "evt",
+  review: "rev",
+  guardflag: "flg",
+  flag: "flg",
+};
+
 function exampleByName(name: string, s: Schema): unknown {
   const n = name.toLowerCase();
   if (s.type === "integer" || s.type === "number") {
@@ -265,7 +286,11 @@ function exampleByName(name: string, s: Schema): unknown {
   if (n.includes("phone")) return "+2348031234567";
   if (n === "cursor" || n.endsWith("cursor")) return "eyJpZCI6InJlc18wMUoifQ";
   if (n === "code" || n.endsWith("reference")) return "HMS-7K3Q9";
-  if (n.endsWith("id")) return `${n.replace(/id$/, "") || "obj"}_01J9ZK4T8Q`;
+  if (n.endsWith("id")) {
+    const stem = n.replace(/id$/, "").replace(/[^a-z]/g, "");
+    const prefix = ID_PREFIX[stem] ?? (stem.slice(0, 3) || "obj");
+    return `${prefix}_01J9ZK4T8Q`;
+  }
   if (n.includes("name")) return n.includes("full") || n.includes("guest") ? "Adaeze Okafor" : "Deluxe King";
   if (n.includes("currency")) return "NGN";
   return "string";
@@ -276,6 +301,8 @@ export function exampleOf(doc: OpenApiDoc, input: Schema | Ref | undefined, name
     if (seen.includes(input.$ref) || depth > MAX_DEPTH) return {};
     seen = [...seen, input.$ref];
   }
+  // The resource this schema describes, so its `id` reads like one ("res_..." for a Reservation).
+  const owner = isRef(input) ? refName(input.$ref) : name;
   const s = mergeAllOf(doc, deref<Schema>(doc, input) ?? {});
   if (s.example !== undefined) return s.example;
   if (s.examples?.length) return s.examples[0];
@@ -295,7 +322,7 @@ export function exampleOf(doc: OpenApiDoc, input: Schema | Ref | undefined, name
     for (const [k, v] of Object.entries(s.properties ?? {})) {
       const prop = deref<Schema>(doc, v);
       if (prop?.writeOnly) continue;
-      out[k] = exampleOf(doc, v, k, seen, depth + 1);
+      out[k] = exampleOf(doc, v, k === "id" ? `${owner}Id` : k, seen, depth + 1);
     }
     return out;
   }
