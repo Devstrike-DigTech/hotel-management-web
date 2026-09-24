@@ -532,7 +532,18 @@ Hotels without the feature no longer show a WhatsApp link at all, since nobody w
 
 The Enterprise tier on the guest side. The contract is the backend's `API-M6.md` (sections 12, 13.4 and 14).
 
-<!-- M6-SHOTS -->
+| The developer docs | An endpoint: schema, Python sample | Search, Ctrl/Cmd+K |
+|---|---|---|
+| ![](docs/screenshots/m6-developers-1440-light.png) | ![](docs/screenshots/m6-dev-reservations-python-1440-light.png) | ![](docs/screenshots/m6-dev-search-1440-dark.png) |
+
+| White-label: Harmattan on its own domain | Its phone site (dark) | The confirmation, the hotel's initials on the stamp | Docs on a phone |
+|---|---|---|---|
+| ![](docs/screenshots/m6-whitelabel-1440-light.png) | ![](docs/screenshots/m6-whitelabel-390-dark.png) | ![](docs/screenshots/m6-whitelabel-confirmation-390-dark.png) | ![](docs/screenshots/m6-dev-contents-390-light.png) |
+
+All M6 screens are in [`docs/screenshots/`](docs/screenshots) as `m6-*.png` at 1440 and 390, light and dark, taken against the live
+backend (the partner spec and the Harmattan seed on `book.harmattanhotels.com`), grain off and quantised to 128 colours. The sandbox's
+network to Google Fonts was unreliable: the white-label home shows the hotel's Cormorant Garamond and Work Sans, while the
+confirmation shots show the house fonts the hotel's fonts fall back to when they cannot be fetched (by design, see below).
 
 ### White-label booking sites
 
