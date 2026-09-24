@@ -33,8 +33,10 @@ export function fontHref(font: FontChoice, italics = false): string | null {
   const family = safeFamily(font);
   if (!family) return null;
   const weights = [...new Set((font.weights ?? []).filter((w) => Number.isInteger(w) && w >= 100 && w <= 900))].sort((a, b) => a - b);
-  if (italics && weights.length) {
-    const axis = `ital,wght@${[...weights.map((w) => `0,${w}`), ...weights.map((w) => `1,${w}`)].join(";")}`;
+  // M7: only the italic cuts the family really has (Google answers 400 for one that does not exist).
+  const italic = font.italicWeights ? font.italicWeights.filter((w) => weights.includes(w)) : weights;
+  if (italics && weights.length && italic.length) {
+    const axis = `ital,wght@${[...weights.map((w) => `0,${w}`), ...italic.map((w) => `1,${w}`)].join(";")}`;
     return `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}:${axis}&display=swap`;
   }
   try {

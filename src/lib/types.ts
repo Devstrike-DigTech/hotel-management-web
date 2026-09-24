@@ -119,6 +119,8 @@ export interface FontChoice {
   family: string;
   category: "serif" | "sans" | "display";
   weights: number[];
+  /** M6 follow-up: the italic cuts Google Fonts has for this family (empty or absent: none). */
+  italicWeights?: number[];
   googleFontsUrl: string;
 }
 
@@ -180,6 +182,8 @@ export interface HotelDetail extends HotelCard {
   whatsapp?: HotelWhatsApp;
   /* M6 */
   whiteLabel?: PublicWhiteLabel | null;
+  /* M7: the published site theme (API-M7 1.9; normalised by lib/theme/normalise.ts) */
+  siteTheme?: Record<string, unknown> | null;
 }
 
 export interface Paginated<T> {

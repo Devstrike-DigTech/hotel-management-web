@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* M7: the six booking-site templates (unlayered, scoped to .brand-scope[data-template]). */
+@import "./templates.css";
 
 /* ------------------------------------------------------------------ *
  *  Laterite & Adire — design tokens
@@ -88,6 +90,11 @@
 @theme {
   --color-*: initial;
   --font-*: initial;
+  /* Not inlined: the booking-site templates (M7) set their own corners through these variables. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 }
 
 @theme inline {
@@ -113,11 +120,6 @@
   --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
   --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
-
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
 
   --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
   --breakpoint-xs: 26rem;
@@ -345,10 +347,11 @@
 }
 
 @utility btn-primary {
-  background: var(--laterite);
-  color: var(--laterite-ink);
+  /* M7: a hotel theme may give fills their own colour (3:1) apart from text (4.5:1). */
+  background: var(--laterite-fill, var(--laterite));
+  color: var(--laterite-fill-ink, var(--laterite-ink));
   &:hover {
-    background: color-mix(in oklab, var(--laterite) 86%, var(--ink));
+    background: color-mix(in oklab, var(--laterite-fill, var(--laterite)) 86%, var(--ink));
   }
 }
 
@@ -564,6 +567,14 @@
 [data-theme="dark"] .brand-scope[style*="--brand"] {
   --laterite: var(--brand-dark);
   --laterite-ink: var(--brand-dark-ink);
+}
+.brand-scope[style*="--brand-fill"] {
+  --laterite-fill: var(--brand-fill);
+  --laterite-fill-ink: var(--brand-fill-ink);
+}
+[data-theme="dark"] .brand-scope[style*="--brand-fill"] {
+  --laterite-fill: var(--brand-fill-dark);
+  --laterite-fill-ink: var(--brand-fill-dark-ink);
 }
 
 /* A "night" band: always dark, in both themes, with its own local tokens. */

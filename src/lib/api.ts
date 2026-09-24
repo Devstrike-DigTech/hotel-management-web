@@ -135,6 +135,42 @@ export const api = {
       return null;
     }
   },
+  /**
+   * M7: a hotel's site theme (API-M7 1.9): the published one, or the draft behind a preview token
+   * (never cached: drafts change by the second). Null when unknown, expired or before M7.
+   */
+  siteTheme: async (slug: string, opts: { preview?: string | null; host?: string | null } = {}): Promise<Record<string, unknown> | null> => {
+    try {
+      return await request<Record<string, unknown>>(
+        `/public/hotels/${encodeURIComponent(slug)}/theme${qs({ preview: opts.preview, host: opts.host })}`,
+        opts.preview ? { revalidate: false } : { revalidate: 60, tags: [`theme:${slug}`] },
+      );
+    } catch (err) {
+      if (err instanceof ApiError && [400, 401, 403, 404, 410].includes(err.status)) return null;
+      throw err;
+    }
+  },
+  /** M7: a hotel group root's theme (the primary property's when the group has none). */
+  groupTheme: async (slug: string, opts: { preview?: string | null; host?: string | null } = {}): Promise<Record<string, unknown> | null> => {
+    try {
+      return await request<Record<string, unknown>>(
+        `/public/groups/${encodeURIComponent(slug)}/theme${qs({ preview: opts.preview, host: opts.host })}`,
+        opts.preview ? { revalidate: false } : { revalidate: 60, tags: [`group-theme:${slug}`] },
+      );
+    } catch (err) {
+      if (err instanceof ApiError && [400, 401, 403, 404, 410].includes(err.status)) return null;
+      throw err;
+    }
+  },
+  /** M7: a hotel's pickup points (arrival and departure transfers). */
+  pickupPoints: async (slug: string): Promise<unknown[]> => {
+    try {
+      const r = await request<unknown>(`/public/hotels/${encodeURIComponent(slug)}/pickup-points`, { revalidate: 60, tags: [`pickups:${slug}`] });
+      return Array.isArray(r) ? r : Array.isArray((r as { items?: unknown[] })?.items) ? (r as { items: unknown[] }).items : [];
+    } catch {
+      return [];
+    }
+  },
   resolveHost: async (host: string): Promise<ResolvedHost | null> => {
     try {
       return await request<ResolvedHost>(`/public/resolve-host${qs({ host })}`, { revalidate: false, timeoutMs: 3000 });

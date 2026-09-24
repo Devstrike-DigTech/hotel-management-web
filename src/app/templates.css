@@ -1,0 +1,445 @@
+/* ------------------------------------------------------------------ *
+ *  M7 booking-site templates. Every template shares the token set in
+ *  globals.css; here each one sets its own shape, type and devices.
+ *  Scoped by .brand-scope[data-template=...] so the marketplace and the
+ *  admin never see any of it.
+ * ------------------------------------------------------------------ */
+
+/* Shape: corners per template (Tailwind's rounded-* read these variables). */
+.brand-scope[data-template="boutique"],
+.brand-scope[data-template="heritage"] {
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+}
+.brand-scope[data-template="business"] {
+  --radius-xs: 0px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+}
+.brand-scope[data-template="resort"] {
+  --radius-xs: 6px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+}
+.brand-scope[data-template="essentials"] {
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+}
+
+/* ---------------------------------------------------------- shared devices */
+
+.faq summary:focus-visible {
+  outline-offset: 4px;
+}
+.faq-mark {
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: 300;
+}
+
+/* A drawn street plan behind the map pin: hairlines at two angles and a river. */
+.map-lines {
+  background-color: currentColor;
+  opacity: 0.55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 40h220M0 104h220M60 0v160M150 0v160M0 150L220 10M30 0l100 160'/%3E%3Cpath d='M0 128c40-10 70 10 110 0s70-24 110-14' stroke-width='5' opacity='.35'/%3E%3Cpath d='M92 40h58v64H92z' stroke-width='.6'/%3E%3C/svg%3E")
+    repeat 0 0 / 220px 160px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='160' fill='none' stroke='%23000' stroke-width='1'%3E%3Cpath d='M0 40h220M0 104h220M60 0v160M150 0v160M0 150L220 10M30 0l100 160'/%3E%3Cpath d='M0 128c40-10 70 10 110 0s70-24 110-14' stroke-width='5' opacity='.35'/%3E%3Cpath d='M92 40h58v64H92z' stroke-width='.6'/%3E%3C/svg%3E")
+    repeat 0 0 / 220px 160px;
+}
+.map-card {
+  border-radius: var(--radius-sm);
+  min-height: 12rem;
+}
+
+.review-quote blockquote p {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+
+.preview-banner {
+  position: sticky;
+  top: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .preview-dot {
+    animation: preview-pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes preview-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+[data-preview="true"] .site-header.sticky {
+  top: 2.25rem;
+}
+
+/* ---------------------------------------------------------- Boutique */
+
+[data-template="boutique"] .display {
+  font-weight: 300;
+  letter-spacing: -0.012em;
+  line-height: 0.96;
+  font-variation-settings: normal;
+}
+[data-template="boutique"] .display-md {
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+.boutique-kicker {
+  font-size: 0.6875rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.boutique-header {
+  position: sticky;
+  top: 0;
+  background: color-mix(in oklab, var(--paper) 94%, transparent);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+/* On a page that opens with a full-bleed photograph, the header floats over it in white. */
+.brand-scope[data-template="boutique"]:has([data-hero-bleed]) .boutique-header {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  background: transparent;
+  border-bottom-color: rgb(255 255 255 / 0.22);
+  color: #fff;
+}
+.brand-scope[data-template="boutique"][data-preview="true"]:has([data-hero-bleed]) .boutique-header {
+  top: 2.25rem;
+}
+.boutique-reserve {
+  transition:
+    background-color 180ms,
+    color 180ms;
+}
+.boutique-reserve:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.brand-scope[data-template="boutique"]:has([data-hero-bleed]) .boutique-reserve:hover {
+  background: #fff;
+  color: #111;
+}
+.boutique-hero {
+  height: min(100svh, 58rem);
+  min-height: 36rem;
+  color: #fff;
+}
+.boutique-scrim {
+  background: linear-gradient(to top, rgb(12 10 8 / 0.7), rgb(12 10 8 / 0.12) 55%, rgb(12 10 8 / 0.38));
+}
+.boutique-staybar .stay-bar-frame {
+  box-shadow: var(--shadow-card);
+}
+.boutique-strip {
+  scrollbar-width: none;
+}
+.boutique-strip::-webkit-scrollbar {
+  display: none;
+}
+.boutique-offer [data-testid="room-offer"] {
+  text-align: left;
+}
+
+/* ---------------------------------------------------------- Business */
+
+[data-template="business"] .display,
+[data-template="business"] .display-md,
+[data-template="business"] .display-sm {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  font-variation-settings: normal;
+}
+[data-template="business"] .accent {
+  font-style: normal;
+  font-weight: 500;
+  font-variation-settings: normal;
+}
+[data-template="business"] .kicker {
+  font-family: var(--font-sans);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.business-staybar .stay-bar-frame {
+  border-color: var(--ink);
+}
+
+/* ---------------------------------------------------------- Resort */
+
+[data-template="resort"] .display-md,
+[data-template="resort"] .display-sm,
+[data-template="resort"] .display {
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  font-variation-settings: normal;
+}
+[data-template="resort"] .accent {
+  font-variation-settings: normal;
+  font-weight: 400;
+}
+.resort-kicker {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--laterite);
+}
+.resort-staybar .stay-bar-frame {
+  border-radius: 999px;
+  overflow: visible;
+  box-shadow: var(--shadow-card);
+}
+.resort-staybar .stay-bar-frame .btn {
+  border-radius: 999px;
+}
+@media (width < 48rem) {
+  .resort-staybar .stay-bar-frame {
+    border-radius: 24px;
+  }
+}
+[data-template="resort"] .btn {
+  border-radius: 999px;
+}
+.resort-gallery button,
+.resort-gallery [class*="rounded-sm"] {
+  border-radius: 20px;
+}
+.resort-quotes > li {
+  border-radius: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 1.5rem;
+}
+.resort-offer [data-testid="room-offer"] {
+  text-align: left;
+}
+
+/* ---------------------------------------------------------- Heritage */
+
+.heritage-display,
+.heritage-title,
+.heritage-name {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.08;
+}
+.heritage-display {
+  letter-spacing: 0.05em;
+  line-height: 1.02;
+}
+.heritage-name {
+  letter-spacing: 0.2em;
+}
+.heritage-caps {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+.heritage-kicker {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  color: var(--ink-muted);
+}
+.heritage-numeral {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--brass);
+  font-size: 1.05rem;
+  letter-spacing: 0.1em;
+}
+/* A photograph in a double frame: a hairline, a margin of paper, a heavier rule. */
+.heritage-frame {
+  padding: 0.5rem;
+  border: 1px solid var(--line-strong);
+  outline: 1px solid var(--line-strong);
+  outline-offset: 4px;
+  background: var(--paper);
+}
+[data-template="heritage"] .display,
+[data-template="heritage"] .display-md,
+[data-template="heritage"] .display-sm {
+  font-variation-settings: normal;
+  letter-spacing: 0.01em;
+}
+[data-template="heritage"] .accent {
+  font-variation-settings: normal;
+}
+.heritage-offer [data-testid="room-offer"] {
+  text-align: center;
+}
+.heritage-prose > p:first-of-type::first-line {
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+}
+.heritage-staybar .stay-bar-frame {
+  outline: 1px solid var(--line-strong);
+  outline-offset: 3px;
+}
+
+/* ---------------------------------------------------------- Essentials */
+
+.lite-page {
+  width: 100%;
+  max-width: 42rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+.lite-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.lite-h2 {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.875rem;
+}
+.lite-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.lite-btn-lg {
+  min-height: 3rem;
+}
+.lite-btn-primary {
+  background: var(--laterite-fill, var(--laterite));
+  color: var(--laterite-fill-ink, var(--laterite-ink));
+}
+.lite-btn-outline {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: var(--surface);
+}
+.lite-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+}
+.lite-sun {
+  display: none;
+}
+[data-theme="dark"] .lite-sun {
+  display: block;
+}
+[data-theme="dark"] .lite-moon {
+  display: none;
+}
+.lite-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.lite-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.lite-form input,
+.lite-form select {
+  min-height: 2.75rem;
+  width: 100%;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+.lite-form button {
+  align-self: end;
+}
+.lite-note {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+.lite-rooms {
+  display: grid;
+  gap: 0.75rem;
+}
+.lite-room {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.lite-img {
+  display: block;
+  width: 4.5rem;
+  height: 3.4rem;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.lite-list {
+  list-style: disc;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+}
+.lite-list > li + li {
+  margin-top: 0.35rem;
+}
+[data-template="essentials"] .kicker {
+  font-family: var(--font-sans);
+  letter-spacing: 0.06em;
+}
+[data-template="essentials"] .display,
+[data-template="essentials"] .display-md,
+[data-template="essentials"] .display-sm {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variation-settings: normal;
+}
+[data-template="essentials"] .accent {
+  font-style: normal;
+  font-variation-settings: normal;
+  font-weight: 700;
+}
+/* No paper grain on Essentials: one fewer layer to paint on a small phone. */
+body:has([data-template="essentials"])::before {
+  display: none;
+}
+
+/* Over the photograph everything in the hero and the floating header reads in white. */
+.boutique-hero .boutique-kicker {
+  color: rgb(255 255 255 / 0.82);
+}
+.brand-scope[data-template="boutique"]:has([data-hero-bleed]) .boutique-header a {
+  color: inherit;
+}
+/* While a photograph loads (or cannot), the pattern stays quiet under the name. */
+.boutique-hero .adire-field {
+  opacity: 0.14;
+}
