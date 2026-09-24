@@ -169,7 +169,7 @@ export function SiteHeader(p: ChromeProps) {
                 </ul>
               </nav>
               <div className="flex items-center gap-1">
-                <ThemeToggle className="!rounded-full" />
+                <ThemeToggle className="!rounded-full max-sm:hidden" />
                 <Link href={book} className="btn btn-primary !min-h-11 !rounded-full !px-5 text-sm">
                   {p.book?.label ?? "Book your stay"}
                 </Link>

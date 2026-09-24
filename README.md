@@ -56,6 +56,7 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint (Next core web vitals and TypeScript rules) |
 | `pnpm test:e2e` | Playwright end-to-end tests against the running app and backend (see Testing) |
+| `pnpm perf:essentials` | M7: JavaScript budget for the Essentials hotel page (see Milestone 7) |
 
 ## Environment
 
@@ -72,6 +73,7 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `TRUSTED_PROXY_SECRET` | a long random string | Server-only. Sent as `X-Proxy-Auth` with the visitor's `X-Client-IP`; must equal the backend's value (see "Trusted client address") |
 | `CLIENT_IP_HEADER` | `cf-connecting-ip` | Optional. A header your host sets with the visitor's address that clients cannot forge |
 | `NEXT_PUBLIC_PARTNER_API_URL` | `https://api.hotelos.ng/api/partner/v1` | Optional (M6). The partner API base the developer docs show; defaults to `NEXT_PUBLIC_API_URL` + `/api/partner/v1` |
+| `LITE_ORIGIN` | `http://127.0.0.1:3000` | Optional (M7). Where the server reaches itself to render the Essentials home without scripts; defaults to `127.0.0.1:$PORT` |
 | `ALLOWED_DEV_ORIGINS` | `harmattanhotels.com,**.harmattanhotels.com` | Development only (M6). Custom domains pointed at your machine that may load dev assets; defaults to the white-label demo |
 
 `NEXT_PUBLIC_*` values are inlined at build time, so rebuild after changing them.
@@ -209,6 +211,7 @@ src/
     ui/                       wordmark, photo plate, money, amenity icons, theme toggle
     developers/               M6 docs shell, search, code plates and tabs, schema tree, operation, guide frame
     site/                     M6 white-label: brand fonts, footer links, platform credit, the site-links context
+    site-templates/           M7: the six templates, their chrome, shared sections, rates ledger, stay bar, preview banner
   lib/
     api.ts, types.ts          typed, server-only client for the public API
     rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
@@ -222,6 +225,10 @@ src/
     dates.ts, format.ts       Lagos dates, naira, VAT
     brand.ts                  hotel accent re-tinting with contrast checks
     white-label.ts            M6: a hotel's colours and fonts as tokens, safe font URLs and footer links
+    theme/                    M7: theme types, template registry, font pairings, the tolerant normaliser, server lookups
+    booking-form.ts           M7: the form model, conditions, client checks, answers, issue mapping, pickup times
+    pickup.ts                 M7: pickup kinds, transport companies, prices and terms in words
+    server/lite.ts            M7: the Essentials home without framework scripts
     developers/               M6: OpenAPI model, example and sample generation, highlighter, guides, search index
     site.ts                   microsite base path and origin
     og.tsx, og-hotel.tsx      OpenGraph image helpers (static TTFs in src/assets/og)
@@ -607,6 +614,126 @@ to end.
 | `white-label.spec.ts` | On `book.harmattanhotels.com` (resolved to this machine by the browser, so the request carries the real `Host`): no platform name, credit or marketplace link on the hotel page or the booking page, the accent is the hotel's colour after the contrast guard, headings and body use the hotel's fonts, its favicon replaces the platform's, its footer links and brand name; the same hotel on the platform subdomain keeps the normal chrome. Then a booking on the domain, the confirmation without "Booked through", and managing it, all on the same domain |
 | `harmattan.spec.ts` | Harmattan (dedicated database) is found by marketplace search and booked end to end with the mock Paystack checkout |
 
+## Milestone 7: booking-site templates, the hotel's own form, extras and pickups
+
+Each hotel's site now has a template and a theme it publishes from the admin's Brand Studio, and a booking form it builds
+in the Form Builder. The contract is the backend's `API-M7.md` (sections 1.8 to 1.10, 2.9 to 2.11, 3.6, 4.7 and 8).
+
+| Editorial | Boutique | Business |
+|---|---|---|
+| ![](docs/screenshots/m7-editorial-1440-light.png) | ![](docs/screenshots/m7-boutique-1440-light.png) | ![](docs/screenshots/m7-business-1440-light.png) |
+
+| Resort | Heritage | Essentials (phone) |
+|---|---|---|
+| ![](docs/screenshots/m7-resort-1440-light.png) | ![](docs/screenshots/m7-heritage-1440-light.png) | ![](docs/screenshots/m7-essentials-390-light.png) |
+
+| A pickup from a motor park | The confirmation, driver assigned | Draft preview |
+|---|---|---|
+| ![](docs/screenshots/m7-book-pickup-1440-light.png) | ![](docs/screenshots/m7-confirmation-transfer-1440-light.png) | ![](docs/screenshots/m7-preview-1440-light.png) |
+
+All M7 screens are in [`docs/screenshots/`](docs/screenshots) as `m7-*.png`: each template at 1440 and 390 in light, two of them in
+dark, the booking steps and the confirmation, grain off and quantised to 128 colours.
+
+### Six templates, one data model
+
+`src/components/site-templates/` holds the layouts; every one of them draws on the same `SiteCtx` (the hotel, its theme, reviews,
+pickup points, dates) and the same server-rendered parts (`parts.tsx`: FAQ with `<details>`, getting here, the drawn map card,
+house rules and the cancellation timeline, contact). What differs is the layout, the type, the shape and the devices:
+
+| Template | Character | Devices |
+|---|---|---|
+| **Editorial** | The house look: a printed travel magazine | Centred masthead, asymmetric plate grid, numbered sections under an ink rule, drop cap, the stay card pinned beside |
+| **Boutique** | Image-led, few words, a lot of air | Full-bleed photograph under a transparent header, the name set large and light, rooms as big alternating plates, a staggered photo strip, one guest's words as a pull quote. Square corners |
+| **Business** | Rates first, dense and quick | Utility bar (phone, corporate rates), booking console and a live ledger of every room and rate above the fold, meeting rooms as a capacity table, a "Travelling for work?" card, guest ratings with subscores. Near-square corners, ink rules |
+| **Resort** | Immersive and soft | A photo mosaic with the name on a card, pill navigation, experiences and rooms as rounded picture cards, amenity chips, a gentle wave between chapters |
+| **Heritage** | Formal and classical | A crest (initials in a double ring, the city on the arc) when there is no logo, ornamental rules, capitals with wide tracking, Roman section numerals, photographs in double frames, a centred tariff |
+| **Essentials** | Text first, for guesthouses and patchy networks | System fonts, a single narrow column, a native date form, a plain room list with small lazy thumbnails, big tap targets for Call and WhatsApp. No client components at all |
+
+- **Sections** come from the published theme: enabled, in order, with the hotel's own options (hero headline, highlights, FAQ items,
+  experiences, dining, meeting rooms, getting-here intro, up to three custom text blocks). Sections the hotel has not written content
+  for fall back to facts from its own data (never invented copy), or are left out.
+- **Colours** are the server's contrast-checked variants (`colours.light` / `colours.dark`): `primaryText` for text and links (4.5:1),
+  `primary` with `onPrimary` for fills (3:1), `secondary` in the brass role. A white-labelled hotel's own brand still wins on its domain.
+- **Fonts**: the pairing's single Google Fonts stylesheet is preloaded and attached after hydration (the M6 fix: a slow font never
+  holds the page); the house pair is already loaded by `next/font`; Essentials uses the system stack and downloads nothing.
+- **Colour mode**: a theme that defaults to light or dark applies it before first paint unless the guest has chosen.
+- **Group roots** render in their theme too (`GET /public/groups/:slug/theme`), with the template's header.
+- **The marketplace** keeps the platform's look: cards and the hotel page carry the hotel's logo (or initials) in its brand colour.
+
+### Essentials: no framework JavaScript on the hotel's home
+
+The Essentials page is built only from server components, so its HTML is complete on its own. On the hotel's home the host proxy
+(`src/proxy.ts`) renders the page as usual and sends it on without the framework's scripts (`src/lib/server/lite.ts`), keeping only
+three inline ones: the theme resolver, the site's colour mode, and a script under a kilobyte for the light/dark switch and fonts
+after first paint. Script and web-font preloads go too; JSON-LD stays. The response carries `x-lite: 1`.
+
+| Page (production build, gzip as `next start` serves it) | Script files | Inline | Total |
+|---|---|---|---|
+| Essentials home (`/h/bodija-heights`) | 0 | 1.0 KB | **1.0 KB** (budget 120 KB) |
+| Editorial home, for comparison | 12 files, 200 KB | 108 KB | 308 KB |
+| A booking page (React app, any template) | 15 files, 261 KB | 53 KB | 314 KB |
+
+The framework alone is about 130 KB gzipped (110 KB brotli), so no hydrated page could meet the budget; serving the Essentials home
+without it is what does. The booking page after it is the normal app. `pnpm perf:essentials [url ...] [--report url]` measures the
+script bytes a page transfers and exits 1 over the budget; `m7.spec.ts` asserts the same in the suite.
+
+### The hotel's booking form
+
+`src/lib/booking-form.ts` models the published form (`GET /public/hotels/:slug/booking-form?channel=`) and
+`src/components/booking/` renders it:
+
+- **Every field type**: short and long text, number, date, time, select (chips up to four options, a list above), multi-select,
+  yes/no, checkbox, phone (+234), email, file uploads (Pro; sent to the upload endpoint at once and booked by token), the extras
+  picker and the pickup block. Labels, help text, "Optional" marks, `aria-required`, `aria-invalid` and described-by hints throughout.
+- **Conditions** are evaluated live exactly as the server does (`EQUALS`, `NOT_EQUALS`, `IN`, `IS_TRUE`, `IS_FALSE`, `NOT_EMPTY`,
+  against answers or the party size; a condition on a field this channel does not show is never met). Hidden answers are not sent.
+- **Steps**: the stay, your details (the form's sections as groups), then "Extras and getting here" when the form has an extras picker,
+  a pickup or those sections, then review and pay.
+- **Email only for online payment**: the details step marks it optional (unless the hotel made it required); choosing "Pay now" without
+  one opens an email box in the review step and nothing is held until it is filled in.
+- **Server issues land under their fields**: `details.issues` paths (`answers.<key>[.<sub>]`, `guest.*`, `extras[i]`, `transfers[i].*`)
+  take the guest back to the step that holds the first one, each message under its field.
+- The review step lists what the guest told the hotel, the pickup and the extras as the quote priced them, each with a way back.
+- Against an API without forms, a built-in form keeps the M3 behaviour.
+
+### Extras and pickups
+
+- **Extras** are grouped by kind (food and drink, arrive early / leave late, celebrations, wellness...) and priced for the dates and party
+  (`GET /public/hotels/:slug/extras`): per stay, night, person, person per night or unit, with a quantity where the pricing needs one,
+  unavailable ones greyed with the reason, and a running total in the step and in the booking summary. They travel in the quote, so the
+  ledger, the hold, Paystack and the card all charge the quoted total; the card lists each one.
+- **The pickup block** asks "How are you arriving?" (by air, by road on a bus, by train, by boat, somewhere else), then where to meet
+  (the hotel's points of that kind with price, notice and hours) and what the driver needs:
+  - **Airport**: airline (with a list of Nigerian and international carriers), flight number, landing date and time, terminal.
+  - **Motor park**: the bus company from the platform's list of Nigerian lines (GIGM, ABC Transport, Peace Mass Transit, Chisco, GUO,
+    Libra, The Young Shall Grow, Efex, Cross Country, Area Motors, Okeyson, Greener Line, Agofure, Ifesinachi and the hotel's own) or
+    "Another company" with free text, where the bus left from, roughly when it gets in ("buses run late; that is fine"), ticket
+    reference and the bus, both optional.
+  - **Train**: the route (Lagos to Ibadan, Abuja to Kaduna, Warri to Itakpe, or another) and the service.
+  - **Jetty or elsewhere**: where exactly, and when.
+  - Then passengers, bags, the vehicle (seats and price), the phone on the day (the guest's by default) and "Take me back when I leave"
+    with the pickup time at the hotel. Lead time, operating hours and the arrival window are checked as you type, in the server's words.
+- **After booking**, the confirmation card and the trip page show each transfer with its status and, once the hotel assigns one, the
+  driver's name, number and plate (and any delay note).
+
+### Draft preview
+
+`?preview=<token>` (from `POST /site/preview-token`, used by the admin's Brand Studio and Form Builder frames) renders the draft theme
+and the draft form. The proxy passes the token on as `x-site-preview` and remembers it for the visit in an httpOnly cookie
+(`?preview=off` leaves); the page shows a "Draft preview" band, is `noindex` (meta and `X-Robots-Tag`), and the final booking is switched
+off. Framing: drafts are frameable only by the admin's origin (`Content-Security-Policy: frame-ancestors <admin origin>`); the live site
+only by itself and the admin. In a preview the booking page takes `?channel=MARKETPLACE` to show that channel's form.
+
+In development `?template=<id>` tries any layout on any hotel (ignored in production).
+
+### Tests (M7)
+
+| Spec | What it proves |
+|---|---|
+| `m7.spec.ts` | Each template renders for its seeded hotel with its hero, rooms and a mark of its own layout (Boutique from the seeded draft through a preview token), keeping a full-page image; the group root is themed; the marketplace shows the hotel's mark without its template. The Essentials home transfers under 120 KB of script (it is served lite, with no script files) and still works: the theme switch and the date form. A booking on Palmwine Lekki's own site with the form's conditional question, an extra and a pickup from Jibowu Motor Park off a GIGM bus from Abuja, seen on review and on the confirmation card. Email not required to pay at the hotel, asked for before paying online. A preview token shows the draft with the banner, `noindex` and `frame-ancestors` for the admin only, while the live site is unchanged |
+
+Earlier specs fill any required question a seeded form adds and pass the extras step (`fillRequiredAnswers`, `passAddOnsStep`).
+
 ## Testing
 
 ```bash
@@ -626,6 +753,7 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `trusted-ip.spec.ts` | M4: which visitor address is sent and how, the secret absent from browser bundles, and live per-visitor rate-limit buckets |
 | `m5.spec.ts` | M5: the group root and booking each of its hotels, the group host, "Part of" on the marketplace, redeeming points at booking, points earned after check-out, WhatsApp chat only on Pro hotels (see the M5 section) |
 | `developers.spec.ts`, `white-label.spec.ts`, `harmattan.spec.ts` | M6: the docs and reference, white-label on a custom domain, Harmattan on its dedicated database (see the M6 section) |
+| `m7.spec.ts` | M7: the six templates, the Essentials budget, booking through the hotel's form with an extra and a motor-park pickup, email by payment method, draft preview (see the M7 section) |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the

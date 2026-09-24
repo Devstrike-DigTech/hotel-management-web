@@ -50,7 +50,38 @@ export function RatesTable({ rooms, look = "business" }: { rooms: RoomTypePublic
           <span className="text-palm">Live from the front desk</span>
         ) : null}
       </div>
-      <div className="overflow-x-auto">
+      {/* Phones: one line per rate, the price and the way in on the right. */}
+      <ul className="divide-y divide-line border-y border-ink sm:hidden">
+        {rows.map(({ room, plan, live, first }) => {
+          const out = dated && live && !live.bookable;
+          const blocked = out || (dated && plan?.quote && !plan.bookable);
+          const total = plan?.quote?.totalKobo ?? (!plan ? live?.quote?.totalKobo : undefined) ?? null;
+          const nightly = plan?.fromKobo ?? room.fromKobo ?? room.basePriceKobo;
+          return (
+            <li key={`m-${room.id}-${plan?.id ?? "base"}`} className="flex items-center justify-between gap-3 py-3" data-testid="rate-row-mobile">
+              <div className="min-w-0">
+                {first ? <p className="font-medium">{room.name}</p> : null}
+                <p className="text-[13px] text-ink-muted">
+                  {plan ? planTitle(plan) : "Room only"}
+                  {plan && isNonRefundable(plan) ? ", non-refundable" : plan ? ", free cancellation" : ""}
+                  {plan?.includesBreakfast ? ", breakfast" : ""}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <p className="num text-right text-sm">
+                  {loading ? <span className="skeleton block h-4 w-16 rounded-xs" /> : dated && total !== null && !blocked ? formatNaira(total) : <span className={blocked ? "text-ink-muted line-through" : ""}>{formatNaira(nightly)}</span>}
+                </p>
+                {blocked ? null : (
+                  <Link href={bookHref(room.id, plan?.id)} className="btn btn-primary !min-h-9 !px-3 text-[13px]" aria-label={`Book the ${room.name}${plan ? `, ${planTitle(plan)} rate` : ""}`}>
+                    Book
+                  </Link>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="relative hidden overflow-x-auto sm:block">
         <table className={`w-full min-w-[34rem] border-collapse text-left ${tight ? "text-[13.5px]" : "text-sm"}`}>
           <thead>
             <tr className="border-y border-ink text-[11px] uppercase tracking-[0.12em] text-ink-muted">
