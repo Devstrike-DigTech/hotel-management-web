@@ -65,6 +65,8 @@ export interface HotelCard {
   searchAvailability?: SearchAvailability | null;
   /* M5, additive: the hotel group, when it has two or more properties. */
   group?: GroupRef | null;
+  /* M7: the hotel's published brand (applied light primary and logo), shown as a mark on marketplace cards. */
+  branding?: { accentColor: string | null; logoUrl: string | null; faviconUrl?: string | null };
 }
 
 /** M5: a hotel group (the tenant). `slug` is the tenant slug; `name` the group's name. */
@@ -88,6 +90,8 @@ export interface HotelGroup {
   branding: { accentColor: string | null; logoUrl: string | null };
   propertyCount: number;
   properties: (HotelCard & { canonicalUrl: string })[];
+  /* M7: the group root's published theme (the primary property's when it has none of its own). */
+  siteTheme?: Record<string, unknown> | null;
 }
 
 /** M5: `GET /public/hotels/:slug/loyalty`. */

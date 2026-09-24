@@ -30,6 +30,8 @@ export interface ChromeProps {
   brandName: string;
   /** Anchors that exist on the home page for this template's sections. */
   nav: { label: string; id: string }[];
+  /** The header's call to action, when it is not the booking page (a group root: "Choose a hotel"). */
+  book?: { href: string; label: string };
 }
 
 const anchor = (p: ChromeProps, id: string) => (p.base ? `${p.base}#${id}` : `/#${id}`);
@@ -47,7 +49,7 @@ function Logo({ p, className }: { p: ChromeProps; className?: string }) {
 
 export function SiteHeader(p: ChromeProps) {
   const tel = p.phone ? `tel:+${toE164Digits(p.phone)}` : null;
-  const book = `${p.base}/book`;
+  const book = p.book?.href ?? `${p.base}/book`;
   const groupLink = p.group ? (
     <li>
       <a href={p.group.href} className="link text-ink/85 hover:text-ink" data-testid="group-link">
@@ -80,7 +82,7 @@ export function SiteHeader(p: ChromeProps) {
             <div className="col-start-3 flex items-center justify-end gap-1">
               <ThemeToggle className="!text-current" />
               <Link href={book} className="boutique-reserve ml-1 inline-flex h-10 items-center border border-current px-4 text-[0.75rem] uppercase tracking-[0.2em]">
-                Reserve
+                {p.book?.label ?? "Reserve"}
               </Link>
             </div>
           </div>
@@ -128,7 +130,7 @@ export function SiteHeader(p: ChromeProps) {
             <div className="flex items-center gap-1">
               <ThemeToggle />
               <Link href={book} className="btn btn-primary ml-1 !min-h-9 !rounded-none !px-4 text-sm">
-                Book now
+                {p.book?.label ?? "Book now"}
               </Link>
             </div>
           </div>
@@ -169,7 +171,7 @@ export function SiteHeader(p: ChromeProps) {
               <div className="flex items-center gap-1">
                 <ThemeToggle className="!rounded-full" />
                 <Link href={book} className="btn btn-primary !min-h-11 !rounded-full !px-5 text-sm">
-                  Book your stay
+                  {p.book?.label ?? "Book your stay"}
                 </Link>
               </div>
             </div>
@@ -206,7 +208,7 @@ export function SiteHeader(p: ChromeProps) {
                   {groupLink}
                   <li>
                     <Link href={book} className="heritage-book inline-flex h-9 items-center border border-laterite px-4 text-laterite transition-colors hover:bg-laterite hover:text-laterite-ink">
-                      Reservations
+                      {p.book?.label ?? "Reservations"}
                     </Link>
                   </li>
                 </ul>
@@ -237,7 +239,7 @@ export function SiteHeader(p: ChromeProps) {
                 </a>
               ) : null}
               <a href={book} className="lite-btn lite-btn-primary">
-                Book
+                {p.book?.label ?? "Book"}
               </a>
             </div>
           </div>
@@ -276,7 +278,7 @@ export function SiteHeader(p: ChromeProps) {
               ) : null}
               <ThemeToggle />
               <Link href={book} className="btn btn-primary ml-1 !min-h-10 !px-4 text-sm">
-                Book a room
+                {p.book?.label ?? "Book a room"}
               </Link>
             </div>
           </div>

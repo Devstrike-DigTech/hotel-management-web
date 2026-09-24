@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SiteLogo } from "@/components/site/site-logo";
 import { BrandFonts, FooterLinks, PoweredBy } from "@/components/site/brand-kit";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { SiteHeader, type ChromeProps } from "@/components/site-templates/chrome";
+import { LiteScript } from "@/components/site-templates/lite";
+import { PreviewBanner } from "@/components/site-templates/preview-banner";
+import { themeStyle } from "@/lib/theme/normalise";
+import { getGroupTheme, previewToken } from "@/lib/theme/server";
 import { brandStyle } from "@/lib/brand";
 import { canonicalGroup, getGroup, getGroupWhiteLabel, groupBase } from "@/lib/site";
 import { hidesPlatform, whiteLabelTheme } from "@/lib/white-label";
@@ -21,6 +23,7 @@ export async function generateMetadata({ params }: LayoutProps<"/g/[group]">): P
     title: { default: group.name, template: `%s — ${group.name}` },
     description,
     applicationName: wl?.brandName || group.name,
+    ...((await previewToken()) ? { robots: { index: false, follow: false, nocache: true } } : {}),
     ...(wl?.faviconUrl ? { icons: { icon: [{ url: wl.faviconUrl }], shortcut: [{ url: wl.faviconUrl }], apple: [{ url: wl.faviconUrl }] } } : {}),
     alternates: { canonical: `${canonical}/` },
     openGraph: {
@@ -44,36 +47,50 @@ export default async function GroupLayout({ children, params }: LayoutProps<"/g/
   const home = base || "/";
   const wl = await getGroupWhiteLabel(group);
   const hide = hidesPlatform(wl);
-  const theme = wl ? whiteLabelTheme(wl, group.branding.accentColor) : null;
-  const logo = wl?.logoUrl || group.branding.logoUrl;
+  const wlTheme = wl ? whiteLabelTheme(wl, group.branding.accentColor) : null;
+  // M7: the group root is themed too (its own theme, or its primary property's).
+  const theme = await getGroupTheme(group);
+  const token = await previewToken();
+  const site = themeStyle(theme);
+  const style = { ...(site.style as object), ...((wlTheme?.style as object) ?? {}) } as React.CSSProperties;
+  const fonts = [...new Set([...(wlTheme?.fonts ?? []), ...(wlTheme?.headingFamily ? [] : site.fonts)])];
+  const logo = wl?.logoUrl || theme.logoUrl || group.branding.logoUrl;
   const brandName = wl?.brandName || group.name;
+  const count = group.properties.length;
+  const chrome: ChromeProps = {
+    template: theme.templateId,
+    name: group.name,
+    tagline: "",
+    area: `${count} ${count === 1 ? "hotel" : "hotels"}`,
+    city: [...new Set(group.properties.map((p) => p.city))].slice(0, 3).join(", "),
+    state: "",
+    address: "",
+    phone: null,
+    email: null,
+    checkInTime: null,
+    checkOutTime: null,
+    logo,
+    base,
+    home,
+    group: null,
+    wl,
+    hidePlatform: hide,
+    brandName,
+    nav: [],
+    book: { href: `${base}#hotels`, label: "Choose a hotel" },
+  };
   return (
     <div
       className="brand-scope flex min-h-dvh flex-col font-sans"
-      style={theme?.style ?? brandStyle(group.branding.accentColor)}
+      style={Object.keys(style).length ? style : brandStyle(group.branding.accentColor)}
+      data-template={theme.templateId}
       data-white-label={wl ? "true" : undefined}
+      data-preview={token ? "true" : undefined}
     >
-      {theme ? <BrandFonts hrefs={theme.fonts} /> : null}
-      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-[6px]">
-        <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
-          <Link href={home} className="-m-1 flex min-w-0 items-center gap-3 rounded-sm p-1">
-            <SiteLogo src={logo} name={group.name} />
-            <span className="min-w-0">
-              <span className="display-sm block truncate text-lg leading-tight">{group.name}</span>
-              <span className="kicker block truncate !text-[10px]">
-                {group.properties.length} {group.properties.length === 1 ? "hotel" : "hotels"}
-              </span>
-            </span>
-          </Link>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <Link href={`${base}#hotels`} className="btn btn-primary ml-1 !min-h-10 !px-3 text-sm sm:!px-4">
-              <span className="sm:hidden">Hotels</span>
-              <span className="hidden sm:inline">Choose a hotel</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      {theme.templateId === "essentials" ? <LiteScript /> : null}
+      {fonts.length ? <BrandFonts hrefs={fonts} /> : null}
+      {token ? <PreviewBanner draft={theme.draft} /> : null}
+      <SiteHeader {...chrome} />
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
         {children}

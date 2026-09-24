@@ -14,6 +14,9 @@ import { useId, useState } from "react";
 import { formatLong, formatMonth, formatWeekday, type ISODate } from "@/lib/dates";
 import { formatClock, formatNaira, formatPhone, plural } from "@/lib/format";
 import { downloadIcs, googleCalendarUrl, mapsUrl, type StayEvent } from "@/lib/ics";
+import type { BookingTransfer } from "@/lib/booking-types";
+import type { AnswerView } from "@/lib/booking-form";
+import { TransferList } from "./transfers";
 
 export interface ConfirmationLine {
   label: string;
@@ -57,6 +60,10 @@ export interface ConfirmationData {
   /** Server .ics URL; falls back to building one in the browser. */
   icsHref?: string | null;
   cancellationNote?: string | null;
+  /** M7: pickups and drop-offs, with the driver once assigned. */
+  transfers?: BookingTransfer[];
+  /** M7: the guest's answers to the hotel's form (non-sensitive). */
+  answers?: AnswerView[];
 }
 
 /**
@@ -176,6 +183,27 @@ export function ConfirmationCard({ data, appName, shareUrl }: { data: Confirmati
         </div>
         <Stamp {...stamp} tone={stampTone} initials={appName ? undefined : initialsOf(data.hotel.name)} className="pointer-events-none hidden w-full sm:block" />
       </section>
+
+      {data.transfers?.length ? (
+        <section aria-label="Getting here" className="border-t border-line px-5 py-6 sm:px-10" data-testid="card-transfers">
+          <p className="kicker mb-3">Getting here</p>
+          <TransferList transfers={data.transfers} compact />
+        </section>
+      ) : null}
+
+      {data.answers?.length ? (
+        <section aria-label="For the hotel" className="border-t border-line px-5 py-5 sm:px-10" data-testid="card-answers">
+          <p className="kicker mb-3">You told the hotel</p>
+          <dl className="grid gap-x-6 gap-y-1.5 text-[13.5px] sm:grid-cols-[minmax(8rem,auto)_1fr]">
+            {data.answers.map((a) => (
+              <div key={a.key} className="contents">
+                <dt className="text-ink-muted">{a.label}</dt>
+                <dd className="min-w-0 break-words">{a.display}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       <Perforation />
 

@@ -68,8 +68,12 @@ export function toConfirmation(b: BookingView, manageHref: string | null): Confi
       ...(pointsKobo > 0
         ? [{ label: `${b.loyalty?.programme ?? "Loyalty"}, ${formatPoints(b.loyalty?.pointsRedeemed ?? 0)} points`, amountKobo: -pointsKobo, kind: "discount" as const }]
         : []),
+      // M7: extras and transfers, each at its price before tax (their tax is in the tax lines below).
+      ...(b.breakdown.addOns ?? []).map((x) => ({ label: x.description, amountKobo: x.netKobo })),
       ...b.breakdown.taxes.map((t) => ({ label: `${t.label} ${t.rateBps / 100}%${t.inclusive ? ", included" : ""}`, amountKobo: t.amountKobo, kind: "tax" as const })),
     ],
+    transfers: (b.transfers ?? []).filter((t) => t.status !== "CANCELLED" || b.status === "CANCELLED"),
+    answers: (b.answers ?? []).filter((a) => a.type !== "PICKUP" && a.type !== "EXTRA" && a.display),
     totalKobo: b.totalKobo,
     paidKobo: b.paidKobo,
     balanceKobo: b.outstandingKobo,

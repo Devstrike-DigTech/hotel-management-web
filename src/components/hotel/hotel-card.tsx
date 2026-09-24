@@ -6,6 +6,7 @@ import { AmenityIcon } from "../ui/amenity";
 import { Money } from "../ui/money";
 import { Plate } from "../ui/plate";
 import { Rating } from "./rating";
+import { HotelMark } from "./hotel-mark";
 
 interface Props {
   hotel: Hotel;
@@ -36,6 +37,7 @@ export function HotelCard({ hotel, plate, size = "md", priority, query = "", asp
         {hotel.featured ? (
           <span className="kicker absolute left-3 top-3 rounded-xs bg-paper/92 px-2 py-1 !text-[10px] !text-ink">Featured</span>
         ) : null}
+        {hotel.branding ? <HotelMark name={hotel.name} logoUrl={hotel.branding.logoUrl} accent={hotel.branding.accentColor} className="absolute bottom-3 left-3" /> : null}
       </div>
       <div className="mt-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -77,6 +79,7 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
   const href = `/stays/${hotel.slug}${query}`;
   return (
     <article className="group relative grid gap-5 py-7 sm:grid-cols-[minmax(0,15rem)_1fr] md:grid-cols-[minmax(0,19rem)_1fr_auto] md:gap-8">
+      <div className="relative">
       <Plate
         src={hotel.coverImageUrl}
         alt={`${hotel.name}, ${hotel.area}`}
@@ -86,6 +89,8 @@ export function HotelRow({ hotel, query = "", index }: { hotel: Hotel; query?: s
         className="aspect-[4/3] rounded-sm"
         imgClassName="group-hover:scale-[1.025]"
       />
+      {hotel.branding ? <HotelMark name={hotel.name} logoUrl={hotel.branding.logoUrl} accent={hotel.branding.accentColor} className="absolute bottom-3 left-3" /> : null}
+      </div>
       <div className="min-w-0">
         <p className="kicker flex items-center gap-2">
           <span className="text-laterite">{String(index + 1).padStart(2, "0")}</span>

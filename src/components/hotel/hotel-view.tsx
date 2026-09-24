@@ -15,6 +15,7 @@ import { formatClock, formatPhone, groupLabel, placeName, roman, toE164Digits } 
 import { AmenityIcon } from "../ui/amenity";
 import { Gallery } from "./gallery";
 import { Rating } from "./rating";
+import { HotelMark } from "./hotel-mark";
 import { HotelReviews } from "../reviews/hotel-reviews";
 import { chatMessage, WhatsAppChat, whatsappChatUrl } from "../chat/whatsapp-chat";
 import type { CancellationPolicy, ReviewPage } from "@/lib/booking-types";
@@ -64,44 +65,12 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
           </nav>
         ) : null}
 
-        {variant === "microsite" ? (
-          <header className="mx-auto mt-6 flex max-w-4xl flex-col items-center text-center sm:mt-10">
-            <span aria-hidden className="adire-rule mb-8 max-w-[14rem] text-laterite/60" />
-            <p className="kicker">
-              Welcome to {hotel.area}, {placeName(hotel.city, hotel.state)}
-            </p>
-            <h1 className="display mt-5 text-[clamp(3rem,9vw,7.4rem)]">
-              <span className="reveal-line">
-                <span>{hotel.name}</span>
-              </span>
-            </h1>
-            {hotel.tagline ? (
-              <p className="fade-up mt-5 max-w-2xl font-display text-[clamp(1.25rem,2.4vw,1.8rem)] italic leading-snug text-laterite [--d:200ms]">
-                {hotel.tagline}
-              </p>
-            ) : null}
-            <div className="mt-8 w-full max-w-md">
-          <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-line bg-line text-sm text-left">
-            <div className="bg-paper p-3">
-              <dt className="kicker !text-[10px]">Reviews</dt>
-              <dd className="mt-1.5">
-                <Rating rating={hotel.rating} reviewCount={hotel.reviewCount} compact />
-              </dd>
-            </div>
-            <div className="bg-paper p-3">
-              <dt className="kicker !text-[10px]">Check in</dt>
-              <dd className="num mt-1.5">{formatClock(hotel.checkInTime)}</dd>
-            </div>
-            <div className="bg-paper p-3">
-              <dt className="kicker !text-[10px]">Check out</dt>
-              <dd className="num mt-1.5">{formatClock(hotel.checkOutTime)}</dd>
-            </div>
-          </dl>
-            </div>
-          </header>
-        ) : (
         <header className={`grid gap-6 lg:grid-cols-12 lg:items-end ${variant === "marketplace" ? "mt-8" : "mt-4"}`}>
           <div className="lg:col-span-8">
+            {/* M7: the hotel's own mark and colour, inside the platform's look. */}
+            {variant === "marketplace" && (hotel.branding.logoUrl || hotel.branding.accentColor) ? (
+              <HotelMark name={hotel.name} logoUrl={hotel.branding.logoUrl} accent={hotel.branding.accentColor} className="mb-4 !shadow-none ring-1 ring-line" />
+            ) : null}
             <p className="kicker flex items-center gap-2">
               <MapPin size={14} weight="fill" className="text-laterite" aria-hidden />
               {hotel.area} &middot; {placeName(hotel.city, hotel.state)}
@@ -143,7 +112,6 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
             </div>
           </dl>
         </header>
-        )}
 
         <div className="fade-up mt-8 [--d:150ms]">
           <Gallery images={images} name={hotel.name} />

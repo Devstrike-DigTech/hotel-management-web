@@ -2,7 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { api } from "../api";
-import type { HotelDetail } from "../types";
+import type { HotelDetail, HotelGroup } from "../types";
 import { normaliseTheme, pickupPoints } from "./normalise";
 import { isTemplateId } from "./registry";
 import type { SiteTheme } from "./types";
@@ -49,3 +49,17 @@ async function resolveTheme(hotel: HotelDetail): Promise<SiteTheme> {
   if (dev && dev !== theme.templateId) return normaliseTheme({ ...(raw ?? {}), templateId: dev, sections: undefined, fontPairing: undefined }, ctx);
   return theme;
 }
+
+/** M7: a group root's theme: the draft behind a preview token, else the published one. */
+export const getGroupTheme = cache(async (group: HotelGroup): Promise<SiteTheme> => {
+  const token = await previewToken();
+  const host = (await headers()).get("x-site-host");
+  const ctx = { accentColor: group.branding.accentColor, logoUrl: group.branding.logoUrl };
+  if (token) {
+    const draft = await api.groupTheme(group.slug, { preview: token, host }).catch(() => null);
+    if (draft) return normaliseTheme(draft, ctx);
+  }
+  const raw = group.siteTheme ?? (await api.groupTheme(group.slug, { host }).catch(() => null));
+  const dev = await devTemplate();
+  return normaliseTheme(dev ? { ...(raw ?? {}), templateId: dev, sections: undefined, fontPairing: undefined } : raw, ctx);
+});
