@@ -1,0 +1,4363 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Partner API",
+  "version": "2026-09-24",
+  "description": "Draft mirror of API-M6 section 12."
+ },
+ "servers": [
+  {
+   "url": "http://localhost:4000/api/partner/v1"
+  }
+ ],
+ "x-changelog": [
+  {
+   "date": "2026-09-24",
+   "changes": [
+    "First release of the partner API: properties, room types, rooms, availability, rates, reservations, guests, folios, housekeeping, daily reports and webhook endpoints.",
+    "Signed webhooks with retries for 24 hours, replay and test pings.",
+    "Test keys (`hk_test_`) run every write as a dry run."
+   ]
+  }
+ ],
+ "tags": [
+  {
+   "name": "Key",
+   "description": "The key making the request."
+  },
+  {
+   "name": "Properties",
+   "description": "The hotels a key can see: all of the tenant's, or the ones it is restricted to."
+  },
+  {
+   "name": "Room types",
+   "description": "Kinds of room each property sells."
+  },
+  {
+   "name": "Rooms",
+   "description": "Physical rooms and their housekeeping status."
+  },
+  {
+   "name": "Availability",
+   "description": "Free rooms per room type per night."
+  },
+  {
+   "name": "Rates",
+   "description": "Resolved nightly rates, and overrides you can set for dates."
+  },
+  {
+   "name": "Reservations",
+   "description": "List, read, create, modify and cancel bookings."
+  },
+  {
+   "name": "Guests",
+   "description": "Guest names and contact details. ID numbers, dates of birth and addresses are never returned."
+  },
+  {
+   "name": "Folios",
+   "description": "A reservation's charges, payments and balance."
+  },
+  {
+   "name": "Housekeeping",
+   "description": "Cleaning and inspection tasks."
+  },
+  {
+   "name": "Reports",
+   "description": "Daily statistics per property."
+  },
+  {
+   "name": "Webhook endpoints",
+   "description": "Manage where events are delivered."
+  }
+ ],
+ "security": [
+  {
+   "bearerAuth": []
+  }
+ ],
+ "paths": {
+  "/me": {
+   "get": {
+    "operationId": "getMe",
+    "tags": [
+     "Key"
+    ],
+    "summary": "Inspect the current key",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "keyId": {
+             "type": "string"
+            },
+            "name": {
+             "type": "string"
+            },
+            "environment": {
+             "type": "string",
+             "enum": [
+              "LIVE",
+              "TEST"
+             ]
+            },
+            "scopes": {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/ApiScope"
+             }
+            },
+            "propertyIds": {
+             "type": [
+              "array",
+              "null"
+             ],
+             "items": {
+              "type": "string"
+             }
+            },
+            "tenant": {
+             "type": "object",
+             "properties": {
+              "id": {
+               "type": "string"
+              },
+              "name": {
+               "type": "string",
+               "example": "Harmattan Hotels & Suites"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/properties": {
+   "get": {
+    "operationId": "listProperties",
+    "tags": [
+     "Properties"
+    ],
+    "summary": "List properties",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Property"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/properties/{id}": {
+   "get": {
+    "operationId": "getProperty",
+    "tags": [
+     "Properties"
+    ],
+    "summary": "Retrieve a property",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The property's id."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Property"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/room-types": {
+   "get": {
+    "operationId": "listRoomTypes",
+    "tags": [
+     "Room types"
+    ],
+    "summary": "List room types",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only this property."
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/RoomType"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/room-types/{id}": {
+   "get": {
+    "operationId": "getRoomType",
+    "tags": [
+     "Room types"
+    ],
+    "summary": "Retrieve a room type",
+    "security": [
+     {
+      "bearerAuth": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The room type's id."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/RoomType"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/rooms": {
+   "get": {
+    "operationId": "listRooms",
+    "tags": [
+     "Rooms"
+    ],
+    "summary": "List rooms",
+    "security": [
+     {
+      "bearerAuth": [
+       "rooms:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only this property."
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "schema": {
+       "$ref": "#/components/schemas/RoomStatus"
+      }
+     },
+     {
+      "name": "roomTypeId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Room"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/rooms/{id}": {
+   "get": {
+    "operationId": "getRoom",
+    "tags": [
+     "Rooms"
+    ],
+    "summary": "Retrieve a room",
+    "security": [
+     {
+      "bearerAuth": [
+       "rooms:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The room's id."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Room"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/rooms/{id}/status": {
+   "patch": {
+    "operationId": "updateRoomStatus",
+    "tags": [
+     "Rooms"
+    ],
+    "summary": "Update a room's status",
+    "security": [
+     {
+      "bearerAuth": [
+       "rooms:write"
+      ]
+     }
+    ],
+    "description": "Same rules as the hotel admin; the change is audited as the API key.",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The room's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "status": {
+          "$ref": "#/components/schemas/RoomStatus"
+         },
+         "note": {
+          "type": "string",
+          "maxLength": 500
+         }
+        },
+        "required": [
+         "status"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Room"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/availability": {
+   "get": {
+    "operationId": "getAvailability",
+    "tags": [
+     "Availability"
+    ],
+    "summary": "Availability by night",
+    "security": [
+     {
+      "bearerAuth": [
+       "availability:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "The property.",
+      "required": true
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "First night, inclusive.",
+      "required": true
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Last night, inclusive. At most 180 nights after `from`.",
+      "required": true
+     },
+     {
+      "name": "roomTypeId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Availability"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/rates": {
+   "get": {
+    "operationId": "listRates",
+    "tags": [
+     "Rates"
+    ],
+    "summary": "Resolved nightly rates",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "The property.",
+      "required": true
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "First night, inclusive.",
+      "required": true
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Last night, inclusive. At most 180 nights after `from`.",
+      "required": true
+     },
+     {
+      "name": "roomTypeId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "ratePlanId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Rate"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/rates/overrides": {
+   "put": {
+    "operationId": "setRateOverrides",
+    "tags": [
+     "Rates"
+    ],
+    "summary": "Set a rate override",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:write"
+      ]
+     }
+    ],
+    "description": "Sets the rate for every night from `from` to `to` inclusive (at most 366 nights).",
+    "parameters": [
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "propertyId": {
+          "type": "string"
+         },
+         "roomTypeId": {
+          "type": "string"
+         },
+         "ratePlanId": {
+          "type": "string"
+         },
+         "from": {
+          "type": "string",
+          "format": "date"
+         },
+         "to": {
+          "type": "string",
+          "format": "date"
+         },
+         "rateKobo": {
+          "type": "integer",
+          "minimum": 0,
+          "example": 8500000
+         }
+        },
+        "required": [
+         "propertyId",
+         "roomTypeId",
+         "from",
+         "to",
+         "rateKobo"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "updated": {
+             "type": "integer",
+             "example": 7
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   },
+   "delete": {
+    "operationId": "clearRateOverrides",
+    "tags": [
+     "Rates"
+    ],
+    "summary": "Clear rate overrides",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:write"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "The property.",
+      "required": true
+     },
+     {
+      "name": "roomTypeId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "required": true
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "First night, inclusive.",
+      "required": true
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "Last night, inclusive. At most 180 nights after `from`.",
+      "required": true
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "deleted": {
+             "type": "integer",
+             "example": 7
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/reservations": {
+   "get": {
+    "operationId": "listReservations",
+    "tags": [
+     "Reservations"
+    ],
+    "summary": "List reservations",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only this property."
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "schema": {
+       "$ref": "#/components/schemas/ReservationStatus"
+      }
+     },
+     {
+      "name": "arrivalFrom",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "arrivalTo",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "updatedSince",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "description": "Only reservations changed since this instant. Use it to keep a copy in sync."
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   },
+   "post": {
+    "operationId": "createReservation",
+    "tags": [
+     "Reservations"
+    ],
+    "summary": "Create a reservation",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:write"
+      ]
+     }
+    ],
+    "description": "Books a nightly stay, confirmed, with source `API`. Availability is checked as the booking is made.",
+    "parameters": [
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReservationCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Reservation"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/reservations/{id}": {
+   "get": {
+    "operationId": "getReservation",
+    "tags": [
+     "Reservations"
+    ],
+    "summary": "Retrieve a reservation",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The reservation's id or its code."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Reservation"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   },
+   "patch": {
+    "operationId": "updateReservation",
+    "tags": [
+     "Reservations"
+    ],
+    "summary": "Modify a reservation",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:write"
+      ]
+     }
+    ],
+    "description": "Availability is checked again for new dates.",
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The reservation's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "arrivalDate": {
+          "type": "string",
+          "format": "date"
+         },
+         "departureDate": {
+          "type": "string",
+          "format": "date"
+         },
+         "adults": {
+          "type": "integer",
+          "minimum": 1
+         },
+         "children": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "notes": {
+          "type": "string"
+         },
+         "externalRef": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Reservation"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/reservations/{id}/cancel": {
+   "post": {
+    "operationId": "cancelReservation",
+    "tags": [
+     "Reservations"
+    ],
+    "summary": "Cancel a reservation",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:write"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The reservation's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "reason": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Reservation"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/reservations/{id}/folio": {
+   "get": {
+    "operationId": "getFolio",
+    "tags": [
+     "Folios"
+    ],
+    "summary": "Retrieve a reservation's folio",
+    "security": [
+     {
+      "bearerAuth": [
+       "folios:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The reservation's id."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Folio"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/guests": {
+   "get": {
+    "operationId": "listGuests",
+    "tags": [
+     "Guests"
+    ],
+    "summary": "List guests",
+    "security": [
+     {
+      "bearerAuth": [
+       "guests:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "updatedSince",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date-time"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Guest"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/guests/{id}": {
+   "get": {
+    "operationId": "getGuest",
+    "tags": [
+     "Guests"
+    ],
+    "summary": "Retrieve a guest",
+    "security": [
+     {
+      "bearerAuth": [
+       "guests:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The guest's id."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/Guest"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/housekeeping/tasks": {
+   "get": {
+    "operationId": "listHousekeepingTasks",
+    "tags": [
+     "Housekeeping"
+    ],
+    "summary": "List housekeeping tasks",
+    "security": [
+     {
+      "bearerAuth": [
+       "housekeeping:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Only this property."
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "Opaque cursor from `pagination.nextCursor` of the previous page."
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      },
+      "description": "Items per page."
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/HousekeepingTask"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/housekeeping/tasks/{id}/complete": {
+   "post": {
+    "operationId": "completeHousekeepingTask",
+    "tags": [
+     "Housekeeping"
+    ],
+    "summary": "Complete a task",
+    "security": [
+     {
+      "bearerAuth": [
+       "housekeeping:write"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The task's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "note": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/HousekeepingTask"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/reports/daily": {
+   "get": {
+    "operationId": "getDailyStats",
+    "tags": [
+     "Reports"
+    ],
+    "summary": "Daily statistics",
+    "security": [
+     {
+      "bearerAuth": [
+       "reports:read"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "schema": {
+       "type": "string"
+      },
+      "description": "The property.",
+      "required": true
+     },
+     {
+      "name": "date",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      },
+      "description": "One day. Or pass `from` and `to` for a range."
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "schema": {
+       "type": "string",
+       "format": "date"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "oneOf": [
+            {
+             "$ref": "#/components/schemas/DailyStats"
+            },
+            {
+             "type": "array",
+             "items": {
+              "$ref": "#/components/schemas/DailyStats"
+             }
+            }
+           ]
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/webhook-endpoints": {
+   "get": {
+    "operationId": "listWebhookEndpoints",
+    "tags": [
+     "Webhook endpoints"
+    ],
+    "summary": "List webhook endpoints",
+    "security": [
+     {
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/WebhookEndpoint"
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   },
+   "post": {
+    "operationId": "createWebhookEndpoint",
+    "tags": [
+     "Webhook endpoints"
+    ],
+    "summary": "Create a webhook endpoint",
+    "security": [
+     {
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
+     }
+    ],
+    "description": "The signing secret is returned once.",
+    "parameters": [
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string",
+          "format": "uri",
+          "example": "https://hooks.example.ng/hotel"
+         },
+         "events": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "example": [
+           "reservation.created",
+           "reservation.cancelled"
+          ]
+         },
+         "description": {
+          "type": "string"
+         },
+         "propertyIds": {
+          "type": [
+           "array",
+           "null"
+          ],
+          "items": {
+           "type": "string"
+          }
+         }
+        },
+        "required": [
+         "url",
+         "events"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Created",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "endpoint": {
+             "$ref": "#/components/schemas/WebhookEndpoint"
+            },
+            "secret": {
+             "type": "string",
+             "example": "whsec_3kq9WmX2..."
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  },
+  "/webhook-endpoints/{id}": {
+   "patch": {
+    "operationId": "updateWebhookEndpoint",
+    "tags": [
+     "Webhook endpoints"
+    ],
+    "summary": "Update a webhook endpoint",
+    "security": [
+     {
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The endpoint's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "url": {
+          "type": "string",
+          "format": "uri"
+         },
+         "events": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         },
+         "description": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "ACTIVE",
+           "DISABLED"
+          ]
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "$ref": "#/components/schemas/WebhookEndpoint"
+          }
+         },
+         "required": [
+          "data"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   },
+   "delete": {
+    "operationId": "deleteWebhookEndpoint",
+    "tags": [
+     "Webhook endpoints"
+    ],
+    "summary": "Delete a webhook endpoint",
+    "security": [
+     {
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string"
+      },
+      "description": "The endpoint's id."
+     },
+     {
+      "$ref": "#/components/parameters/IdempotencyKey"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "X-Request-Id": {
+        "$ref": "#/components/headers/X-Request-Id"
+       },
+       "RateLimit-Limit": {
+        "$ref": "#/components/headers/RateLimit-Limit"
+       },
+       "RateLimit-Remaining": {
+        "$ref": "#/components/headers/RateLimit-Remaining"
+       },
+       "RateLimit-Reset": {
+        "$ref": "#/components/headers/RateLimit-Reset"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "object",
+           "properties": {
+            "success": {
+             "type": "boolean"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "400": {
+      "$ref": "#/components/responses/E400"
+     },
+     "401": {
+      "$ref": "#/components/responses/E401"
+     },
+     "403": {
+      "$ref": "#/components/responses/E403"
+     },
+     "404": {
+      "$ref": "#/components/responses/E404"
+     },
+     "409": {
+      "$ref": "#/components/responses/E409"
+     },
+     "422": {
+      "$ref": "#/components/responses/E422"
+     },
+     "429": {
+      "$ref": "#/components/responses/E429"
+     }
+    }
+   }
+  }
+ },
+ "webhooks": {
+  "reservation.created": {
+   "post": {
+    "summary": "A reservation is made from any channel.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.created"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "reservation.updated": {
+   "post": {
+    "summary": "Dates, guests or room change.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.updated"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "reservation.cancelled": {
+   "post": {
+    "summary": "A reservation is cancelled.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.cancelled"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "reservation.checked_in": {
+   "post": {
+    "summary": "The guest is checked in.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.checked_in"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "reservation.checked_out": {
+   "post": {
+    "summary": "The guest is checked out.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.checked_out"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "reservation.no_show": {
+   "post": {
+    "summary": "The reservation is marked a no-show.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "reservation.no_show"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/Reservation"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "payment.received": {
+   "post": {
+    "summary": "Money is posted to a folio.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "payment.received"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/PaymentReceived"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "room.status_changed": {
+   "post": {
+    "summary": "A room's status changes.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "room.status_changed"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/RoomStatusChanged"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "housekeeping.task_completed": {
+   "post": {
+    "summary": "A housekeeping task is done.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "housekeeping.task_completed"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/HousekeepingTask"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "review.published": {
+   "post": {
+    "summary": "A guest review is published.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "review.published"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/ReviewPublished"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "guard.flag_raised": {
+   "post": {
+    "summary": "Revenue Guard raises a flag.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "guard.flag_raised"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "$ref": "#/components/schemas/GuardFlag"
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  },
+  "webhook.ping": {
+   "post": {
+    "summary": "A test ping from the admin.",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "example": "evt_01J9ZK4T8Q"
+         },
+         "type": {
+          "type": "string",
+          "const": "webhook.ping"
+         },
+         "createdAt": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "apiVersion": {
+          "type": "string",
+          "example": "2026-09-24"
+         },
+         "livemode": {
+          "type": "boolean"
+         },
+         "tenantId": {
+          "type": "string"
+         },
+         "propertyId": {
+          "type": "string"
+         },
+         "data": {
+          "type": "object",
+          "properties": {
+           "object": {
+            "type": "object",
+            "properties": {}
+           }
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Any 2xx within 10 seconds counts as delivered."
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "securitySchemes": {
+   "bearerAuth": {
+    "type": "http",
+    "scheme": "bearer",
+    "bearerFormat": "hk_live_<prefix>_<secret>"
+   }
+  },
+  "parameters": {
+   "IdempotencyKey": {
+    "name": "Idempotency-Key",
+    "in": "header",
+    "required": true,
+    "schema": {
+     "type": "string",
+     "maxLength": 255
+    },
+    "description": "Unique per logical write. A retry with the same key replays the first response for 72 hours."
+   }
+  },
+  "headers": {
+   "X-Request-Id": {
+    "description": "Quote this when you contact support.",
+    "schema": {
+     "type": "string"
+    }
+   },
+   "RateLimit-Limit": {
+    "description": "Requests allowed per minute.",
+    "schema": {
+     "type": "integer"
+    }
+   },
+   "RateLimit-Remaining": {
+    "description": "Requests left in this window.",
+    "schema": {
+     "type": "integer"
+    }
+   },
+   "RateLimit-Reset": {
+    "description": "Seconds until the window resets.",
+    "schema": {
+     "type": "integer"
+    }
+   }
+  },
+  "responses": {
+   "E400": {
+    "description": "Bad request",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 400,
+       "code": "IDEMPOTENCY_KEY_REQUIRED",
+       "message": "Bad request",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E401": {
+    "description": "The key is missing, unknown, revoked or expired",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 401,
+       "code": "INVALID_API_KEY",
+       "message": "The key is missing, unknown, revoked or expired",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E403": {
+    "description": "The key may not do this",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 403,
+       "code": "INSUFFICIENT_SCOPE",
+       "message": "The key may not do this",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E404": {
+    "description": "No such resource",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 404,
+       "code": "NOT_FOUND",
+       "message": "No such resource",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E409": {
+    "description": "Conflict with the current state",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 409,
+       "code": "ROOM_UNAVAILABLE",
+       "message": "Conflict with the current state",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E422": {
+    "description": "The body did not validate",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 422,
+       "code": "VALIDATION_ERROR",
+       "message": "The body did not validate",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   },
+   "E429": {
+    "description": "Too many requests",
+    "content": {
+     "application/json": {
+      "schema": {
+       "$ref": "#/components/schemas/Error"
+      },
+      "example": {
+       "statusCode": 429,
+       "code": "RATE_LIMITED",
+       "message": "Too many requests",
+       "requestId": "req_01J9ZK4T8QX"
+      }
+     }
+    }
+   }
+  },
+  "schemas": {
+   "Error": {
+    "type": "object",
+    "properties": {
+     "statusCode": {
+      "type": "integer"
+     },
+     "code": {
+      "type": "string"
+     },
+     "message": {
+      "type": "string"
+     },
+     "details": {
+      "type": "object",
+      "additionalProperties": true
+     },
+     "requestId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "statusCode",
+     "code",
+     "message",
+     "requestId"
+    ]
+   },
+   "Pagination": {
+    "type": "object",
+    "properties": {
+     "nextCursor": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Pass as `cursor` for the next page; null on the last page."
+     },
+     "limit": {
+      "type": "integer"
+     }
+    }
+   },
+   "ApiScope": {
+    "type": "string",
+    "enum": [
+     "reservations:read",
+     "reservations:write",
+     "availability:read",
+     "rates:read",
+     "rates:write",
+     "guests:read",
+     "folios:read",
+     "rooms:read",
+     "rooms:write",
+     "housekeeping:read",
+     "housekeeping:write",
+     "webhooks:manage",
+     "reports:read"
+    ]
+   },
+   "Property": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string",
+      "example": "Harmattan Abuja"
+     },
+     "slug": {
+      "type": "string",
+      "example": "harmattan-abuja"
+     },
+     "city": {
+      "type": "string",
+      "example": "Abuja"
+     },
+     "state": {
+      "type": "string",
+      "example": "FCT"
+     },
+     "area": {
+      "type": "string",
+      "example": "Maitama"
+     },
+     "address": {
+      "type": "string"
+     },
+     "phone": {
+      "type": "string"
+     },
+     "email": {
+      "type": "string",
+      "format": "email"
+     },
+     "timezone": {
+      "type": "string",
+      "const": "Africa/Lagos"
+     },
+     "checkInTime": {
+      "type": "string",
+      "example": "14:00"
+     },
+     "checkOutTime": {
+      "type": "string",
+      "example": "12:00"
+     },
+     "currency": {
+      "type": "string",
+      "const": "NGN"
+     }
+    }
+   },
+   "RoomType": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string",
+      "example": "Executive King"
+     },
+     "description": {
+      "type": "string"
+     },
+     "capacity": {
+      "type": "integer",
+      "example": 2
+     },
+     "bedType": {
+      "type": "string",
+      "example": "King"
+     },
+     "sizeSqm": {
+      "type": "integer",
+      "example": 32
+     },
+     "basePriceKobo": {
+      "type": "integer",
+      "example": 8500000
+     },
+     "amenities": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "roomCount": {
+      "type": "integer",
+      "example": 24
+     }
+    }
+   },
+   "RoomStatus": {
+    "type": "string",
+    "enum": [
+     "VACANT_CLEAN",
+     "VACANT_DIRTY",
+     "OCCUPIED",
+     "RESERVED",
+     "OUT_OF_ORDER"
+    ]
+   },
+   "Room": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "roomTypeId": {
+      "type": "string"
+     },
+     "number": {
+      "type": "string",
+      "example": "204"
+     },
+     "floor": {
+      "type": "integer",
+      "example": 2
+     },
+     "status": {
+      "$ref": "#/components/schemas/RoomStatus"
+     },
+     "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "Availability": {
+    "type": "object",
+    "properties": {
+     "propertyId": {
+      "type": "string"
+     },
+     "roomTypeId": {
+      "type": "string"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "available": {
+      "type": "integer",
+      "example": 6
+     },
+     "sellable": {
+      "type": "integer"
+     },
+     "booked": {
+      "type": "integer"
+     },
+     "blocked": {
+      "type": "integer"
+     }
+    }
+   },
+   "Rate": {
+    "type": "object",
+    "properties": {
+     "propertyId": {
+      "type": "string"
+     },
+     "roomTypeId": {
+      "type": "string"
+     },
+     "ratePlanId": {
+      "type": "string"
+     },
+     "ratePlanName": {
+      "type": "string",
+      "example": "Best available"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "rateKobo": {
+      "type": "integer",
+      "example": 8500000
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "BASE",
+       "SEASON",
+       "OVERRIDE",
+       "PRICING"
+      ]
+     },
+     "restrictions": {
+      "type": "object",
+      "properties": {
+       "stopSell": {
+        "type": "boolean"
+       },
+       "closedToArrival": {
+        "type": "boolean"
+       },
+       "closedToDeparture": {
+        "type": "boolean"
+       },
+       "minNights": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "ReservationStatus": {
+    "type": "string",
+    "enum": [
+     "PENDING",
+     "CONFIRMED",
+     "CHECKED_IN",
+     "CHECKED_OUT",
+     "CANCELLED",
+     "NO_SHOW"
+    ]
+   },
+   "ReservationCreate": {
+    "type": "object",
+    "properties": {
+     "propertyId": {
+      "type": "string"
+     },
+     "roomTypeId": {
+      "type": "string"
+     },
+     "arrivalDate": {
+      "type": "string",
+      "format": "date"
+     },
+     "departureDate": {
+      "type": "string",
+      "format": "date"
+     },
+     "adults": {
+      "type": "integer",
+      "minimum": 1,
+      "example": 2
+     },
+     "children": {
+      "type": "integer",
+      "minimum": 0,
+      "example": 0
+     },
+     "ratePlanId": {
+      "type": "string"
+     },
+     "guest": {
+      "type": "object",
+      "properties": {
+       "fullName": {
+        "type": "string",
+        "example": "Adaeze Okafor"
+       },
+       "phone": {
+        "type": "string",
+        "example": "+2348031234567"
+       },
+       "email": {
+        "type": "string",
+        "format": "email"
+       }
+      },
+      "required": [
+       "fullName",
+       "phone"
+      ]
+     },
+     "notes": {
+      "type": "string"
+     },
+     "externalRef": {
+      "type": "string",
+      "description": "Your own id for the booking, echoed back."
+     }
+    },
+    "required": [
+     "propertyId",
+     "roomTypeId",
+     "arrivalDate",
+     "departureDate",
+     "adults",
+     "guest"
+    ]
+   },
+   "Reservation": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "code": {
+      "type": "string",
+      "example": "HHA-7K3Q9"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ReservationStatus"
+     },
+     "source": {
+      "type": "string",
+      "example": "API"
+     },
+     "stayType": {
+      "type": "string",
+      "enum": [
+       "NIGHTLY",
+       "DAY_USE"
+      ]
+     },
+     "arrivalDate": {
+      "type": "string",
+      "format": "date"
+     },
+     "departureDate": {
+      "type": "string",
+      "format": "date"
+     },
+     "arrivalAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "departureAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "nights": {
+      "type": "integer",
+      "example": 2
+     },
+     "adults": {
+      "type": "integer",
+      "example": 2
+     },
+     "children": {
+      "type": "integer",
+      "example": 0
+     },
+     "roomType": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string",
+        "example": "Executive King"
+       }
+      }
+     },
+     "room": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "number": {
+          "type": "string",
+          "example": "204"
+         }
+        }
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "ratePlan": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        }
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "rateKobo": {
+      "type": "integer",
+      "example": 8500000
+     },
+     "nightlyRates": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "date": {
+         "type": "string",
+         "format": "date"
+        },
+        "rateKobo": {
+         "type": "integer",
+         "example": 8500000
+        }
+       }
+      }
+     },
+     "guest": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string"
+       },
+       "fullName": {
+        "type": "string",
+        "example": "Adaeze Okafor"
+       }
+      }
+     },
+     "notes": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "externalRef": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "cancelledAt": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     }
+    }
+   },
+   "Guest": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "fullName": {
+      "type": "string"
+     },
+     "phone": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "email": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "email"
+     },
+     "nationality": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "example": "NG"
+     },
+     "vip": {
+      "type": "boolean"
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "Folio": {
+    "type": "object",
+    "properties": {
+     "reservationId": {
+      "type": "string"
+     },
+     "folioId": {
+      "type": "string"
+     },
+     "status": {
+      "type": "string",
+      "example": "OPEN"
+     },
+     "currency": {
+      "type": "string",
+      "const": "NGN"
+     },
+     "balanceKobo": {
+      "type": "integer"
+     },
+     "chargesKobo": {
+      "type": "integer"
+     },
+     "paymentsKobo": {
+      "type": "integer"
+     },
+     "entries": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "type": {
+         "type": "string",
+         "example": "ROOM_CHARGE"
+        },
+        "description": {
+         "type": "string"
+        },
+        "amountKobo": {
+         "type": "integer"
+        },
+        "paymentMethod": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "createdAt": {
+         "type": "string",
+         "format": "date-time"
+        },
+        "voided": {
+         "type": "boolean"
+        }
+       }
+      }
+     }
+    }
+   },
+   "HousekeepingTask": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "roomId": {
+      "type": "string"
+     },
+     "roomNumber": {
+      "type": "string",
+      "example": "204"
+     },
+     "type": {
+      "type": "string",
+      "example": "CHECKOUT_CLEAN"
+     },
+     "status": {
+      "type": "string",
+      "example": "DONE"
+     },
+     "priority": {
+      "type": "string",
+      "example": "NORMAL"
+     },
+     "assignee": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string"
+         },
+         "fullName": {
+          "type": "string"
+         }
+        }
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "dueAt": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "completedAt": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date-time"
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "DailyStats": {
+    "type": "object",
+    "properties": {
+     "propertyId": {
+      "type": "string"
+     },
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "roomsAvailable": {
+      "type": "integer"
+     },
+     "roomsSold": {
+      "type": "integer"
+     },
+     "occupancyPct": {
+      "type": "number",
+      "example": 72.5
+     },
+     "adrKobo": {
+      "type": "integer"
+     },
+     "revparKobo": {
+      "type": "integer"
+     },
+     "roomRevenueKobo": {
+      "type": "integer"
+     },
+     "totalRevenueKobo": {
+      "type": "integer"
+     },
+     "arrivals": {
+      "type": "integer"
+     },
+     "departures": {
+      "type": "integer"
+     },
+     "noShows": {
+      "type": "integer"
+     }
+    }
+   },
+   "WebhookEndpoint": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "url": {
+      "type": "string",
+      "format": "uri"
+     },
+     "description": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "events": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "propertyIds": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "items": {
+       "type": "string"
+      }
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "ACTIVE",
+       "DISABLED"
+      ]
+     },
+     "disabledReason": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "secretPreview": {
+      "type": "string",
+      "example": "whsec_...a1B2"
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "PaymentReceived": {
+    "type": "object",
+    "properties": {
+     "reservationId": {
+      "type": "string"
+     },
+     "folioId": {
+      "type": "string"
+     },
+     "entryId": {
+      "type": "string"
+     },
+     "amountKobo": {
+      "type": "integer"
+     },
+     "method": {
+      "type": "string",
+      "example": "TRANSFER"
+     },
+     "reference": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "receivedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "RoomStatusChanged": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Room"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "previousStatus": {
+        "$ref": "#/components/schemas/RoomStatus"
+       }
+      }
+     }
+    ]
+   },
+   "ReviewPublished": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "overall": {
+      "type": "integer",
+      "example": 5
+     },
+     "title": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     },
+     "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   },
+   "GuardFlag": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string"
+     },
+     "propertyId": {
+      "type": "string"
+     },
+     "rule": {
+      "type": "string"
+     },
+     "severity": {
+      "type": "string"
+     },
+     "title": {
+      "type": "string"
+     },
+     "amountKobo": {
+      "type": [
+       "integer",
+       "null"
+      ]
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    }
+   }
+  }
+ }
+}
