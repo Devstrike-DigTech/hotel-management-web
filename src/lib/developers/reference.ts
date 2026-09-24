@@ -293,6 +293,7 @@ function exampleByName(name: string, s: Schema): unknown {
   }
   if (s.type !== "string" && s.type !== undefined) return undefined;
   if (s.format === "date-time") return "2026-10-02T13:00:00.000Z";
+  if ((s.format === "date" || n.endsWith("date")) && /^(departure|checkout|to$|arrivalto)/.test(n)) return "2026-10-04";
   if (s.format === "date" || n.endsWith("date") || n === "checkin" || n === "checkout" || n === "from" || n === "to") return "2026-10-02";
   if (s.format === "email" || n.includes("email")) return "adaeze.okafor@example.ng";
   if (s.format === "uri" || s.format === "url" || n.endsWith("url")) return "https://example.ng/hooks/hotel";

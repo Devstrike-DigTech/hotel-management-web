@@ -67,9 +67,12 @@ test("the code sample language is shared by every sample and remembered", async 
 
 test("search finds guides and endpoints with Ctrl+K, and deep links land on the endpoint", async ({ page }) => {
   await page.goto("/developers");
-  await page.keyboard.press("Control+k");
   const input = page.getByTestId("docs-search-input");
-  await expect(input).toBeFocused();
+  // The shortcut works once the page has hydrated; keep trying until it does.
+  await expect(async () => {
+    if (!(await input.isVisible())) await page.keyboard.press("Control+k");
+    await expect(input).toBeFocused({ timeout: 1000 });
+  }).toPass();
   await input.fill("cancel reservation");
   await expect(page.getByRole("option").first()).toContainText("Cancel a reservation");
   await page.keyboard.press("Enter");
