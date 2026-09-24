@@ -46,6 +46,17 @@ export function ResortPage({ ctx, sections }: { ctx: SiteCtx; sections: ThemeSec
   );
 }
 
+/** Mosaic cells on a 4 x 2 grid for one to five photographs (phones show the first only). */
+function mosaicCell(i: number, n: number) {
+  if (i === 0) return n === 1 ? "col-span-4 row-span-2" : n === 2 ? "col-span-4 row-span-2 md:col-span-2" : "col-span-4 row-span-2 md:col-span-2";
+  const rest: Record<number, string[]> = {
+    2: ["md:col-span-2 md:row-span-2"],
+    3: ["md:col-span-1 md:row-span-2", "md:col-span-1 md:row-span-2"],
+    4: ["md:col-span-2 md:row-span-1", "md:col-span-1 md:row-span-1", "md:col-span-1 md:row-span-1"],
+  };
+  return `hidden md:block ${(rest[n] ?? [])[i - 1] ?? "md:col-span-1 md:row-span-1"}`;
+}
+
 function Wave() {
   return (
     <svg viewBox="0 0 1200 24" preserveAspectRatio="none" className="mx-auto block h-5 w-full max-w-3xl text-laterite/45" aria-hidden>
@@ -107,7 +118,7 @@ function ResortSection({ ctx, section, first }: { ctx: SiteCtx; section: ThemeSe
                 caption={i !== 0}
                 sizes={i === 0 ? "(min-width: 768px) 50vw, 100vw" : "25vw"}
                 priority={i === 0}
-                className={`rounded-[22px] ${i === 0 ? "col-span-4 row-span-2 md:col-span-2" : i < 3 ? "hidden md:block" : "hidden md:block"} ${pics.length === 1 ? "!col-span-4" : ""}`}
+                className={`rounded-[22px] ${mosaicCell(i, pics.length)}`}
               />
             ))}
             <div className="absolute bottom-4 left-4 right-4 max-w-lg rounded-[20px] bg-paper/95 p-5 shadow-[var(--shadow-float)] sm:bottom-6 sm:left-6 sm:p-7">

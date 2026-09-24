@@ -69,9 +69,9 @@ export function ExtrasPicker({
                       <div className="min-w-0">
                         <p className="font-medium leading-snug">{e.name}</p>
                         {e.description ? <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">{e.description}</p> : null}
-                        {e.kind === "EARLY_CHECK_IN" && e.availability.earlyFrom ? (
+                        {e.kind === "EARLY_CHECK_IN" && e.availability.earlyFrom && !e.description?.includes(e.availability.earlyFrom) ? (
                           <p className="num mt-1 text-[12px] text-ink-muted">Room ready from {e.availability.earlyFrom}</p>
-                        ) : e.kind === "LATE_CHECK_OUT" && e.availability.lateUntil ? (
+                        ) : e.kind === "LATE_CHECK_OUT" && e.availability.lateUntil && !e.description?.includes(e.availability.lateUntil) ? (
                           <p className="num mt-1 text-[12px] text-ink-muted">Leave by {e.availability.lateUntil}</p>
                         ) : null}
                       </div>

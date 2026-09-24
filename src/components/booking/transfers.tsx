@@ -53,7 +53,7 @@ export function TransferList({ transfers, compact = false }: { transfers: Bookin
               <div className="mt-3 grid gap-2 rounded-xs bg-surface-2 px-3 py-2.5 text-sm sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-5" data-testid="transfer-driver">
                 <p>
                   <span className="text-ink-muted">Your driver </span>
-                  <span className="font-medium">{t.driver.name}</span>
+                  <span className="whitespace-nowrap font-medium">{t.driver.name}</span>
                 </p>
                 <a href={`tel:+${toE164Digits(t.driver.phone)}`} className="num inline-flex items-center gap-1.5 hover:text-laterite">
                   <Phone size={15} aria-hidden /> {formatPhone(t.driver.phone)}

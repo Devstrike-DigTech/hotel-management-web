@@ -214,9 +214,11 @@ function EssentialsSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSecti
       return wrap(
         titleOf(section, "Good to know"),
         <ul className="lite-list">
-          <li>
-            Check in from <span className="num">{formatClock(hotel.checkInTime)}</span>, check out by <span className="num">{formatClock(hotel.checkOutTime)}</span>.
-          </li>
+          {hotel.policies.some((p) => /check-?\s?in/i.test(p)) ? null : (
+            <li>
+              Check in from <span className="num">{formatClock(hotel.checkInTime)}</span>, check out by <span className="num">{formatClock(hotel.checkOutTime)}</span>.
+            </li>
+          )}
           {hotel.booking?.cancellationPolicy ? <li>{hotel.booking.cancellationPolicy.summary}</li> : null}
           {hotel.policies.map((p, i) => (
             <li key={i}>{p}</li>

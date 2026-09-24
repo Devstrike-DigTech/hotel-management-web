@@ -62,7 +62,7 @@ export function SiteHeader(p: ChromeProps) {
     case "boutique":
       return (
         <header className="site-header boutique-header z-40">
-          <div className="container-page grid h-20 grid-cols-[1fr_auto_1fr] items-center gap-4">
+          <div className="container-page grid h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
             <nav aria-label="Hotel" className="hidden md:block">
               <ul className="flex items-center gap-7 text-[0.8125rem] uppercase tracking-[0.18em]">
                 {p.nav.slice(0, 3).map((n) => (
@@ -77,10 +77,10 @@ export function SiteHeader(p: ChromeProps) {
             </nav>
             <Link href={p.home} className="col-start-1 flex min-w-0 items-center gap-3 justify-self-start md:col-start-2 md:justify-self-center" aria-label={`${p.name}, home`}>
               {p.logo ? <SiteLogo src={p.logo} name={p.name} /> : null}
-              <span className="display truncate text-[1.6rem] tracking-[0.02em] sm:text-[1.9rem]">{p.name}</span>
+              <span className="display truncate text-[1.3rem] tracking-[0.02em] sm:text-[1.9rem]">{p.name}</span>
             </Link>
-            <div className="col-start-3 flex items-center justify-end gap-1">
-              <ThemeToggle className="!text-current" />
+            <div className="flex items-center justify-end gap-1 md:col-start-3">
+              <ThemeToggle className="!text-current max-sm:hidden" />
               <Link href={book} className="boutique-reserve ml-1 inline-flex h-10 items-center border border-current px-4 text-[0.75rem] uppercase tracking-[0.2em]">
                 {p.book?.label ?? "Reserve"}
               </Link>
@@ -235,7 +235,7 @@ export function SiteHeader(p: ChromeProps) {
               <LiteThemeToggle />
               {tel ? (
                 <a href={tel} className="lite-btn lite-btn-outline" aria-label={`Call ${p.name}`}>
-                  <Phone size={16} aria-hidden /> <span className="max-[380px]:sr-only">Call</span>
+                  <Phone size={16} aria-hidden /> <span className="max-sm:sr-only">Call</span>
                 </a>
               ) : null}
               <a href={book} className="lite-btn lite-btn-primary">

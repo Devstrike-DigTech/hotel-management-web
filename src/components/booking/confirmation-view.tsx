@@ -369,7 +369,7 @@ export function ConfirmationView({
           </h2>
           <ol className="mt-5 grid gap-px overflow-hidden rounded-sm border border-line bg-line sm:grid-cols-3">
             {[
-              [EnvelopeSimple, "Now", "Your confirmation and receipt go to your email, and a short SMS with the code."],
+              [EnvelopeSimple, "Now", b.guest.email ? "Your confirmation and receipt go to your email, and a short SMS with the code." : "A short SMS with the code goes to your phone. Your receipt comes at the front desk."],
               [BellRinging, "The day before", `We send directions, the check-in time and the front desk's number for ${b.hotel.name}.`],
               [ChatCircleText, "After you leave", "A short note asking how it went. Only guests who stayed can review."],
             ].map(([Icon, when, body], i) => {
