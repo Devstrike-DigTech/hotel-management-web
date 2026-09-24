@@ -43,7 +43,7 @@ test.describe("booking-site templates", () => {
     { id: "business", path: "/h/palmwine-house-ikoyi", marker: '[data-testid="rates-table"]' },
     { id: "resort", path: "/h/eko-tides", marker: ".resort-mosaic" },
     { id: "heritage", path: "/h/harmattan-abuja", marker: ".heritage-frame" },
-    { id: "essentials", path: "/h/bodija-heights", marker: '[data-testid="lite-dates"]' },
+    { id: "essentials", path: "/h/bodija-heights", marker: '[data-testid="lite-room"]' },
   ];
   for (const c of cases) {
     test(`${c.id} renders for its seeded hotel`, async ({ page }) => {
@@ -87,12 +87,12 @@ test("Essentials stays inside its JavaScript budget", async ({ page }) => {
   console.log(`Essentials home: ${(js / 1024).toFixed(1)} KB of script files (${scripts.length}), ${(inline / 1024).toFixed(1)} KB inline`);
   expect(js + inline).toBeLessThan(ESSENTIALS_BUDGET);
   expect(await page.locator("script[src]").count()).toBe(0);
-  // It still works without the framework: the date form goes to the booking page, the theme switch flips.
+  // It still works without the framework: the theme switch flips, and a room's link opens the booking page.
   const before = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.locator("[data-lite-theme]").click();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).not.toBe(before);
-  await page.getByTestId("lite-dates").getByRole("button", { name: "See prices" }).click();
-  await expect(page).toHaveURL(/\/h\/bodija-heights\/book\?checkIn=/);
+  await page.getByTestId("lite-room").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/h\/bodija-heights\/book\?room=/);
 });
 
 interface PublicField {
@@ -164,7 +164,7 @@ test("book through the hotel's own form: a conditional question, an extra and a 
   const park = page.getByTestId("pickup-point").filter({ hasText: /Jibowu/ });
   await expect(park).toBeVisible();
   await park.click();
-  const gigm = await page.getByTestId("pickup-company").locator("option", { hasText: "GIGM" }).first().getAttribute("value");
+  const gigm = await page.getByTestId("pickup-company").locator("option", { hasText: "God is Good" }).first().getAttribute("value");
   await page.getByTestId("pickup-company").selectOption(gigm!);
   await page.getByTestId("pickup-from-city").fill("Abuja");
   await page.getByTestId("pickup-time").fill("15:30");
@@ -186,7 +186,7 @@ test("book through the hotel's own form: a conditional question, an extra and a 
   await expect(card).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(new RegExp(`/h/${slug}/booking/confirmation`));
   await expect(card.getByTestId("card-transfers")).toContainText("Jibowu");
-  await expect(card.getByTestId("card-transfers")).toContainText(/GIGM|God is Good/);
+  await expect(card.getByTestId("card-transfers")).toContainText(/GIG|God is Good/);
   await expect(card).toContainText(extraName.split(" ")[0]);
 });
 

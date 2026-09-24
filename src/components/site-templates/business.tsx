@@ -41,7 +41,8 @@ export function BusinessPage({ ctx, sections }: { ctx: SiteCtx; sections: ThemeS
   return (
     <StayProvider initial={ctx.initial} today={ctx.today} bookBase={ctx.bookBase} slug={hotel.slug} cancellationPolicy={hotel.booking?.cancellationPolicy ?? null} channel="BOOKING_SITE">
       <div className="pb-16 lg:pb-0" data-template-page="business">
-        {hero ? <BusinessHero ctx={ctx} section={hero} rates={rates} /> : rates ? <RatesBand ctx={ctx} section={rates} /> : null}
+        {/* Without a hero the name still heads the page, above the booking console and the rates. */}
+        <BusinessHero ctx={ctx} section={hero ?? null} rates={rates} />
         <div className="container-page mt-12 grid gap-10 lg:grid-cols-[1fr_20rem]">
           <div className="min-w-0 space-y-12">
             {rest.map((s) => (
@@ -59,15 +60,16 @@ export function BusinessPage({ ctx, sections }: { ctx: SiteCtx; sections: ThemeS
   );
 }
 
-function BusinessHero({ ctx, section, rates }: { ctx: SiteCtx; section: ThemeSection; rates?: ThemeSection }) {
+function BusinessHero({ ctx, section, rates }: { ctx: SiteCtx; section: ThemeSection | null; rates?: ThemeSection }) {
   const { hotel } = ctx;
   const facts = hotel.amenities.filter((a) => WORK_FIRST.test(a)).slice(0, 4);
+  const compact = !section;
   return (
-    <section aria-labelledby="hotel-name" className="border-b border-line bg-surface" data-section="hero">
-      <div className="container-page grid gap-8 py-8 lg:grid-cols-[1fr_22rem] lg:items-end lg:py-10">
+    <section aria-labelledby="hotel-name" className="border-b border-line bg-surface" data-section={compact ? "title" : "hero"}>
+      <div className={`container-page grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-end ${compact ? "py-6" : "py-8 lg:py-10"}`}>
         <div>
-          <p className="kicker">{section.options.subtitle ?? `${hotel.area}, ${hotel.city}`}</p>
-          <h1 id="hotel-name" className="mt-3 font-display text-[clamp(2.2rem,4.6vw,3.6rem)] font-medium leading-[1.02] tracking-[-0.03em]">
+          <p className="kicker">{section?.options.subtitle ?? `${hotel.area}, ${hotel.city}`}</p>
+          <h1 id="hotel-name" className={`mt-3 font-display font-medium leading-[1.02] tracking-[-0.03em] ${compact ? "text-[clamp(1.9rem,3.6vw,2.8rem)]" : "text-[clamp(2.2rem,4.6vw,3.6rem)]"}`}>
             {hotel.name}
           </h1>
           {ctx.tagline ? <p className="mt-3 max-w-2xl text-[1.0625rem] text-ink-muted">{ctx.tagline}</p> : null}
@@ -86,7 +88,7 @@ function BusinessHero({ ctx, section, rates }: { ctx: SiteCtx; section: ThemeSec
             ))}
           </ul>
         </div>
-        <Plate src={section.options.imageUrl ?? ctx.images[0]?.url} alt={ctx.images[0]?.alt ?? hotel.name} label={hotel.name} sizes="22rem" priority className="hidden aspect-[16/10] lg:block" />
+        {compact ? null : <Plate src={section?.options.imageUrl ?? ctx.images[0]?.url} alt={ctx.images[0]?.alt ?? hotel.name} label={hotel.name} sizes="22rem" priority className="hidden aspect-[16/10] lg:block" />}
       </div>
       <div className="border-t border-line bg-paper">
         <div className="container-page py-5">

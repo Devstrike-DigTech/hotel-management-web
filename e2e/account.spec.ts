@@ -26,8 +26,9 @@ test("sign in with a phone code, and the booking made earlier is in Trips", asyn
   const code = await page.getByTestId("booking-code").innerText();
 
   await signInWithOtp(page, guest.phone);
-  // A first sign-in lands on the profile to add a name, then on to Trips.
-  await page.waitForURL(/\/(account|trips)/);
+  // A first sign-in lands on the profile to add a name, then on to Trips. Wait until it has left the
+  // sign-in form, or the next navigation would cancel the code check.
+  await page.waitForURL((u) => /^\/(account|trips)/.test(u.pathname) && !u.pathname.startsWith("/account/sign-in"));
   await page.goto("/trips");
   const trips = page.getByTestId("trips-upcoming");
   await expect(trips).toBeVisible();

@@ -39,6 +39,22 @@ export function buildSiteCtx(input: {
 /** The hotel's home page in its template, sections in the order the theme gives them. */
 export function SitePage({ ctx }: { ctx: SiteCtx }) {
   const sections = visibleSections(ctx.theme);
+  // A page always has its heading: when the hotel switched the hero off, the name is there for screen readers.
+  const heading =
+    sections.some((s) => s.key === "hero") || ctx.theme.templateId === "business" ? null : (
+      <h1 id="hotel-name" className="sr-only">
+        {ctx.hotel.name}
+      </h1>
+    );
+  return (
+    <>
+      {heading}
+      <TemplateBody ctx={ctx} sections={sections} />
+    </>
+  );
+}
+
+function TemplateBody({ ctx, sections }: { ctx: SiteCtx; sections: ReturnType<typeof visibleSections> }) {
   switch (ctx.theme.templateId) {
     case "boutique":
       return <BoutiquePage ctx={ctx} sections={sections} />;
