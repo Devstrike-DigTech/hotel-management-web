@@ -61,6 +61,7 @@ async function expectNoPlatform(page: Page) {
 }
 
 test("a white-labelled hotel's own domain carries its brand and no platform chrome", async ({ page, request }) => {
+  test.setTimeout(180_000);
   const { slug, wl, name } = await brandFor(request);
   await page.goto(`${SITE}/`);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(name);
@@ -70,8 +71,17 @@ test("a white-labelled hotel's own domain carries its brand and no platform chro
 
   // The hotel's colour takes the accent role, darkened only as far as contrast needs.
   if (wl.primaryColor) {
-    const laterite = await scope.evaluate((el) => getComputedStyle(el).getPropertyValue("--laterite").trim().toLowerCase());
-    expect(laterite).toBe(brandVars(wl.primaryColor)!.light);
+    // The web caches hotel data for a minute, so a brand just changed in the admin may take that long to show.
+    await expect
+      .poll(
+        async () => {
+          const v = await page.locator("[data-white-label=true]").evaluate((el) => getComputedStyle(el).getPropertyValue("--laterite").trim().toLowerCase());
+          if (v !== brandVars(wl.primaryColor)!.light) await page.reload();
+          return v;
+        },
+        { timeout: 90_000, intervals: [5_000] },
+      )
+      .toBe(brandVars(wl.primaryColor)!.light);
     const button = await page.getByRole("link", { name: "Book a room" }).first().evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(button).not.toBe("rgb(180, 69, 42)"); // the platform's laterite
   }
