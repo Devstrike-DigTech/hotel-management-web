@@ -4,6 +4,7 @@ import type { RoomTypePublic } from "@/lib/types";
 import { Plate } from "../ui/plate";
 import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
+import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
 import type { SiteCtx } from "./context";
 import { OrnamentRule } from "./ornaments";
@@ -69,6 +70,7 @@ const IDS: Partial<Record<ThemeSection["key"], string>> = {
   faq: "faq",
   contact: "contact",
   "rates-calendar": "rates",
+  concierge: "concierge",
 };
 
 function HeritageSection({ ctx, section, n }: { ctx: SiteCtx; section: ThemeSection; n: number }) {
@@ -268,6 +270,8 @@ function HeritageSection({ ctx, section, n }: { ctx: SiteCtx; section: ThemeSect
       );
     case "rates-calendar":
       return shell(titleOf(section, "Tariff"), <RatesTable rooms={hotel.roomTypes} look="editorial" />, null, false);
+    case "concierge":
+      return ctx.concierge ? shell(titleOf(section, "At Your Service"), <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="heritage" body={section.options.body} />, section.options.subtitle ?? "Arranged by the concierge") : null;
     case "custom-text":
       return shell(titleOf(section, "A Note"), <CustomText section={section} className="mx-auto max-w-2xl text-center text-[1.0625rem] leading-[1.8]" />, section.options.subtitle);
     default:

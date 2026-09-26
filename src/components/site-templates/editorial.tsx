@@ -8,6 +8,7 @@ import { MobileBookBar, StayCard, StayProvider } from "../hotel/stay-context";
 import { HotelReviews } from "../reviews/hotel-reviews";
 import { WhatsAppChat } from "../chat/whatsapp-chat";
 import { RatesTable } from "./rates-table";
+import { ConciergeShowcase } from "./concierge";
 import type { SiteCtx } from "./context";
 import {
   AddressBlock,
@@ -128,6 +129,7 @@ const ANCHORS: Partial<Record<ThemeSection["key"], string>> = {
   faq: "faq",
   contact: "contact",
   "rates-calendar": "rates",
+  concierge: "concierge",
 };
 
 function EditorialSection({ ctx, section, n, first }: { ctx: SiteCtx; section: ThemeSection; n: number; first: boolean }) {
@@ -261,6 +263,14 @@ function EditorialSection({ ctx, section, n, first }: { ctx: SiteCtx; section: T
         </>,
       );
     }
+    case "concierge":
+      return ctx.concierge
+        ? wrap(
+            titleOf(section, "Arrange something for your stay"),
+            <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="editorial" body={section.options.body} />,
+            section.options.subtitle ?? "The concierge",
+          )
+        : null;
     case "custom-text":
       return wrap(titleOf(section, section.options.subtitle ?? "A note from the house"), <CustomText section={section} className="prose-body max-w-[62ch]" />);
     default:

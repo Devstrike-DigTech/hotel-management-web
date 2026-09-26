@@ -5,6 +5,7 @@ import type { RoomTypePublic } from "@/lib/types";
 import { Plate } from "../ui/plate";
 import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
+import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
 import type { SiteCtx } from "./context";
 import {
@@ -53,6 +54,7 @@ const IDS: Partial<Record<ThemeSection["key"], string>> = {
   reviews: "reviews",
   contact: "contact",
   "rates-calendar": "rates",
+  concierge: "concierge",
 };
 
 function Heading({ id, kicker, title, center = false }: { id: string; kicker?: string | null; title: string; center?: boolean }) {
@@ -287,6 +289,17 @@ function BoutiqueSection({ ctx, section, index }: { ctx: SiteCtx; section: Theme
           <ContactList ctx={ctx} className="mt-8 inline-block text-left" />
         </div>,
       );
+    case "concierge":
+      return ctx.concierge
+        ? shell(
+            <div className="container-page py-24 sm:py-32">
+              <Heading id={tid} kicker={section.options.subtitle ?? "The concierge"} title={titleOf(section, "Arranged for you")} />
+              <div className="mt-10">
+                <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="boutique" body={section.options.body} />
+              </div>
+            </div>,
+          )
+        : null;
     case "custom-text":
       return shell(
         <div className="container-page py-20">

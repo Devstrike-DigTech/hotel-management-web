@@ -5,6 +5,7 @@ import { AmenityIcon } from "../ui/amenity";
 import { Plate } from "../ui/plate";
 import { MobileBookBar, StayProvider } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
+import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
 import type { SiteCtx } from "./context";
 import {
@@ -133,6 +134,7 @@ const IDS: Partial<Record<ThemeSection["key"], string>> = {
   "location-map": "location",
   faq: "faq",
   contact: "contact",
+  concierge: "concierge",
 };
 
 function BusinessSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSection }) {
@@ -365,6 +367,8 @@ function BusinessSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSection
         </ul>,
       );
     }
+    case "concierge":
+      return ctx.concierge ? wrap(titleOf(section, "Concierge"), <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="business" body={section.options.body} />, `${ctx.concierge.services.length} services`) : null;
     case "custom-text":
       return wrap(titleOf(section, "Notes"), <CustomText section={section} className="max-w-[65ch] text-[0.9375rem] leading-relaxed" />);
     default:

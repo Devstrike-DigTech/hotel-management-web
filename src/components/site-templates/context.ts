@@ -1,4 +1,5 @@
 import type { ReviewPage } from "@/lib/booking-types";
+import type { ConciergeCatalogue } from "@/lib/concierge";
 import type { ISODate } from "@/lib/dates";
 import type { SectionItem, SiteTheme, ThemeSection } from "@/lib/theme/types";
 import type { HotelDetail, ImageRef } from "@/lib/types";
@@ -24,6 +25,8 @@ export interface SiteCtx {
   tagline: string;
   /** Preview mode keeps links inside the draft. */
   preview: boolean;
+  /** M8: the hotel's live concierge services for its own site, or null when it has none. */
+  concierge: ConciergeCatalogue | null;
 }
 
 export interface SectionProps {

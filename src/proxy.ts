@@ -25,7 +25,8 @@ import { stripScripts } from "./lib/server/lite";
  *                      `x-site-preview`, remembered for the visit in an httpOnly cookie, noindex, and
  *                      frameable only by the admin's origin (CSP frame-ancestors). ?preview=off leaves.
  *   every site page    `frame-ancestors 'self' <admin origin>`, so nobody else can frame the booking flow.
- *   Essentials home    served without the framework's scripts (see lib/server/lite.ts).
+ *   Essentials home    served without the framework's scripts (see lib/server/lite.ts), and (M8)
+ *                      the concierge's catalogue page, which is server-rendered the same way.
  *   ?template=<id>     development only: try a template on any hotel.
  */
 
@@ -240,8 +241,8 @@ function setSiteHost(headers: Headers, customHost: string | null) {
 
 async function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string, customHost: string | null = null) {
   const preview = previewOf(req);
-  // M7: the Essentials home goes out without framework scripts (unless this is that very request).
-  if (rest === "/" && isDocument(req) && req.headers.get("x-lite-inner") !== LITE_SECRET) {
+  // M7: the Essentials home (and M8 its concierge catalogue) goes out without framework scripts (unless this is that very request).
+  if ((rest === "/" || rest === "/concierge") && isDocument(req) && req.headers.get("x-lite-inner") !== LITE_SECRET) {
     const template = devTemplate(req) ?? (preview.token ? null : await publishedTemplate(slug, clientIpFrom(req.headers)));
     if (template === "essentials") {
       const lite = await liteHome(req, preview);

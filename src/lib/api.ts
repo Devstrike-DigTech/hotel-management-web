@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { API_URL } from "./env";
 import { clientIpFrom, trustedProxyHeaders } from "./server/client-ip";
 import type { BookingConfig, ReviewPage } from "./booking-types";
+import { normaliseCatalogue, type ConciergeCatalogue } from "./concierge";
 import type {
   ApiErrorBody,
   AppInfo,
@@ -203,6 +204,21 @@ export const api = {
       return Array.isArray(r) ? r : Array.isArray((r as { items?: unknown[] })?.items) ? (r as { items: unknown[] }).items : [];
     } catch {
       return [];
+    }
+  },
+  /**
+   * M8: the hotel's live, approved concierge services (API-M8 4.6; without a channel, those offered
+   * while booking or during the stay). Null when the hotel
+   * has no concierge (not on its plan, switched off, suspended) or the API predates it.
+   */
+  concierge: async (slug: string, channel?: "BOOKING_FLOW" | "TRIP_PAGE"): Promise<ConciergeCatalogue | null> => {
+    try {
+      const raw = await request<unknown>(`/public/hotels/${encodeURIComponent(slug)}/concierge${qs({ channel })}`, { revalidate: 30, tags: [`concierge:${slug}`] });
+      const cat = normaliseCatalogue(raw);
+      return cat.unavailable ? null : cat;
+    } catch (err) {
+      if (err instanceof ApiError && [0, 400, 401, 402, 403, 404, 410].includes(err.status)) return null;
+      throw err;
     }
   },
   resolveHost: async (host: string): Promise<ResolvedHost | null> => {

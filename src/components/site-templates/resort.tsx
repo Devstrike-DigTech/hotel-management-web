@@ -6,6 +6,7 @@ import { Plate } from "../ui/plate";
 import { Gallery } from "../hotel/gallery";
 import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
+import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
 import type { SiteCtx } from "./context";
 import {
@@ -90,6 +91,7 @@ const IDS: Partial<Record<ThemeSection["key"], string>> = {
   faq: "faq",
   contact: "contact",
   "rates-calendar": "rates",
+  concierge: "concierge",
 };
 
 function ResortSection({ ctx, section, first }: { ctx: SiteCtx; section: ThemeSection; first: boolean }) {
@@ -303,6 +305,15 @@ function ResortSection({ ctx, section, first }: { ctx: SiteCtx; section: ThemeSe
           <ContactList ctx={ctx} className="mt-8 inline-block text-left" />
         </div>,
       );
+    case "concierge":
+      return ctx.concierge
+        ? shell(
+            <div className="container-page">
+              <Heading id={tid} kicker={section.options.subtitle ?? "The concierge"} title={titleOf(section, "Anything we can arrange")} />
+              <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="resort" body={section.options.body} />
+            </div>,
+          )
+        : null;
     case "custom-text":
       return shell(
         <div className="container-page">

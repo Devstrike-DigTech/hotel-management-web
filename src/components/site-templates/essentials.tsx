@@ -5,6 +5,7 @@ import { formatClock, formatNaira, formatPhone, toE164Digits } from "@/lib/forma
 import type { ThemeSection } from "@/lib/theme/types";
 import type { RoomTypePublic } from "@/lib/types";
 import type { SiteCtx } from "./context";
+import { ConciergeShowcase } from "./concierge";
 import { CustomText, diningItems, experienceItems, FaqList, faqItems, highlightItems, meetingItems, PickupList, pickupSentenceFor, titleOf } from "./parts";
 
 /**
@@ -52,6 +53,7 @@ const IDS: Partial<Record<ThemeSection["key"], string>> = {
   faq: "faq",
   contact: "contact",
   highlights: "about",
+  concierge: "concierge",
 };
 
 function EssentialsSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSection }) {
@@ -283,6 +285,8 @@ function EssentialsSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSecti
         </ul>,
       );
     }
+    case "concierge":
+      return ctx.concierge ? wrap(titleOf(section, "Arrange something for your stay"), <ConciergeShowcase catalogue={ctx.concierge} base={ctx.base} hotelName={ctx.hotel.name} look="essentials" body={section.options.body} />) : null;
     case "custom-text":
       return wrap(titleOf(section, "A note"), <CustomText section={section} className="leading-relaxed" />);
     default:

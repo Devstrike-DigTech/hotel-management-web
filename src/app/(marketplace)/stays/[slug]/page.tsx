@@ -28,7 +28,7 @@ export default async function HotelPage({ params, searchParams }: PageProps<"/st
   const sp = await searchParams;
   const hotel = await getHotel(slug);
   if (!hotel) notFound();
-  const reviews = await settle(api.reviews(hotel.slug, { pageSize: 6 }));
+  const [reviews, concierge] = await Promise.all([settle(api.reviews(hotel.slug, { pageSize: 6 })), settle(api.concierge(hotel.slug))]);
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
   const guests = Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12);
@@ -39,6 +39,7 @@ export default async function HotelPage({ params, searchParams }: PageProps<"/st
       <HotelView
         hotel={hotel}
         reviews={reviews.data}
+        concierge={concierge.data}
         today={today}
         initial={{ ...stay, guests }}
         bookBase={`/stays/${hotel.slug}/book`}

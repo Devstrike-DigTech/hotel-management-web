@@ -12,6 +12,8 @@ export const SECTION_KEYS = [
   "hero",
   "highlights",
   "rooms",
+  /** M8: "Arrange something for your stay", the hotel's concierge services. */
+  "concierge",
   "rates-calendar",
   "amenities",
   "gallery",

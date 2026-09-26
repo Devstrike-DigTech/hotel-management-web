@@ -19,6 +19,7 @@ export function buildSiteCtx(input: {
   today: ISODate;
   initial: SiteCtx["initial"];
   preview: boolean;
+  concierge?: SiteCtx["concierge"];
 }): SiteCtx {
   const { hotel } = input;
   const hero = input.theme.sections.find((s) => s.key === "hero");
@@ -26,6 +27,7 @@ export function buildSiteCtx(input: {
   const minRoom = hotel.roomTypes.reduce<number | null>((m, r) => (m === null || r.basePriceKobo < m ? r.basePriceKobo : m), null);
   return {
     ...input,
+    concierge: input.concierge?.services.length ? input.concierge : null,
     bookBase: `${input.base}/book`,
     from: hotel.startingRateKobo ?? minRoom,
     images,
@@ -38,7 +40,8 @@ export function buildSiteCtx(input: {
 
 /** The hotel's home page in its template, sections in the order the theme gives them. */
 export function SitePage({ ctx }: { ctx: SiteCtx }) {
-  const sections = visibleSections(ctx.theme);
+  // M8: the concierge section only when the hotel has live services (so numbered sections stay in sequence).
+  const sections = visibleSections(ctx.theme).filter((s) => s.key !== "concierge" || ctx.concierge);
   // A page always has its heading: when the hotel switched the hero off, the name is there for screen readers.
   const heading =
     sections.some((s) => s.key === "hero") || ctx.theme.templateId === "business" ? null : (

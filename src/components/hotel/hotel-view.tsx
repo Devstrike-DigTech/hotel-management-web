@@ -21,8 +21,12 @@ import { chatMessage, WhatsAppChat, whatsappChatUrl } from "../chat/whatsapp-cha
 import type { CancellationPolicy, ReviewPage } from "@/lib/booking-types";
 import { RoomList } from "./room-list";
 import { MobileBookBar, StayCard, StayProvider } from "./stay-context";
+import type { ConciergeCatalogue } from "@/lib/concierge";
+import { ConciergeShowcase } from "../site-templates/concierge";
 
 interface Props {
+  /** M8: the hotel's live concierge services, or null. */
+  concierge?: ConciergeCatalogue | null;
   hotel: HotelDetail;
   reviews: ReviewPage | null;
   today: ISODate;
@@ -32,7 +36,7 @@ interface Props {
 }
 
 /** The hotel page, shared by the marketplace (/stays/[slug]) and the hotel's own microsite. */
-export function HotelView({ hotel, reviews, today, initial, bookBase, variant }: Props) {
+export function HotelView({ hotel, reviews, today, initial, bookBase, variant, concierge = null }: Props) {
   const policy = hotel.booking?.cancellationPolicy ?? null;
   const images = hotel.images.length
     ? hotel.images
@@ -149,6 +153,21 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant }:
                 <RoomList rooms={hotel.roomTypes} />
               </div>
             </section>
+
+            {/* M8: the concierge (its own pages are on the hotel's site) */}
+            {concierge?.services.length ? (
+              <section id="concierge" aria-labelledby="concierge-title" className="mt-14 scroll-mt-28">
+                <div className="flex items-baseline justify-between gap-4 border-b border-ink pb-3">
+                  <h2 id="concierge-title" className="display-sm text-[1.9rem]">
+                    Arrange something <em className="accent">for your stay</em>
+                  </h2>
+                  <span className="kicker max-sm:hidden">The concierge</span>
+                </div>
+                <div className="mt-6">
+                  <ConciergeShowcase catalogue={concierge} base={`/h/${hotel.slug}`} hotelName={hotel.name} look="editorial" body={null} />
+                </div>
+              </section>
+            ) : null}
 
             {/* Reviews */}
             <section id="reviews" aria-labelledby="reviews-title" className="mt-14 scroll-mt-28">

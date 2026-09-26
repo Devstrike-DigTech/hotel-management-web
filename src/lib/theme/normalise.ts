@@ -115,7 +115,29 @@ function sections(v: unknown, templateId: TemplateId): ThemeSection[] {
       options: options(r.options, r.resolved),
     });
   });
-  return out.sort((a, b) => a.order - b.order);
+  out.sort((a, b) => a.order - b.order);
+  return withConcierge(out, templateId);
+}
+
+/**
+ * M8: a theme published before the concierge existed has no section for it. It goes in where the
+ * template puts it by default (after the section before it in the registry), switched on; it only
+ * shows when the hotel has live services. A theme that lists the section keeps the hotel's choice.
+ */
+function withConcierge(list: ThemeSection[], templateId: TemplateId): ThemeSection[] {
+  if (list.some((s) => s.key === "concierge")) return list;
+  const reg = TEMPLATES[templateId].sections.map((s) => s.key);
+  const at = reg.indexOf("concierge");
+  if (at < 0) return list;
+  const before = reg
+    .slice(0, at)
+    .reverse()
+    .find((k) => list.some((s) => s.key === k));
+  const firstBody = list.findIndex((s) => s.key !== "hero");
+  const idx = before ? list.findIndex((s) => s.key === before) + 1 : firstBody < 0 ? list.length : firstBody;
+  const out = [...list];
+  out.splice(idx, 0, { key: "concierge", id: "concierge", enabled: true, order: 0, options: emptyOptions() });
+  return out.map((s, i) => ({ ...s, order: i }));
 }
 
 function fontChoice(v: unknown): FontChoice | null {

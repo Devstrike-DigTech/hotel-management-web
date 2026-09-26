@@ -14,7 +14,13 @@ export default async function MicrositeHome({ params, searchParams }: PageProps<
   const sp = await searchParams;
   const hotel = await getHotel(slug);
   if (!hotel) notFound();
-  const [reviews, theme, base, token] = await Promise.all([settle(api.reviews(hotel.slug, { pageSize: 6 })), getSiteTheme(hotel), siteBase(slug), previewToken()]);
+  const [reviews, theme, base, token, concierge] = await Promise.all([
+    settle(api.reviews(hotel.slug, { pageSize: 6 })),
+    getSiteTheme(hotel),
+    siteBase(slug),
+    previewToken(),
+    settle(api.concierge(hotel.slug)),
+  ]);
   const today = todayInLagos();
   const stay = normaliseStay(one(sp.checkIn), one(sp.checkOut), today);
   const ctx = buildSiteCtx({
@@ -25,6 +31,7 @@ export default async function MicrositeHome({ params, searchParams }: PageProps<
     today,
     initial: { ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) },
     preview: !!token,
+    concierge: concierge.data,
   });
   return (
     <>
