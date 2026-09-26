@@ -3,13 +3,21 @@
  "info": {
   "title": "Hotel partner API",
   "version": "2026-09-24",
-  "description": "Versioned API for integrations (PMS bridges, channel tools, BI). JSON, camelCase, money in kobo, dates in Africa/Lagos. Authenticate with an API key from the hotel admin (Settings > Integrations): `Authorization: Bearer hk_live_...`. Test keys (`hk_test_...`) validate writes fully and roll them back; responses carry `dryRun: true`."
+  "description": "Versioned API for integrations (PMS bridges, channel tools, BI). JSON, camelCase, money in kobo, dates in Africa/Lagos. Authenticate with an API key created in the hotel admin under Developers: `Authorization: Bearer hk_live_...`. Test keys (`hk_test_...`) validate writes fully and roll them back; responses carry `dryRun: true`."
  },
  "x-changelog": [
   {
    "date": "2026-09-24",
    "changes": [
-    "First release: properties, room types, rooms, availability, rates, reservations, guests, folios, housekeeping, daily reports, webhook endpoints."
+    "First release: properties, room types, rooms, availability, rates, reservations, guests, folios, housekeeping, daily reports, webhook endpoints.",
+    "Tags per resource, stable operationIds, scopes per operation (security + x-scopes) and one schema per webhook event.",
+    "Booking-form answers (with field metadata), paid extras and transfers on reservations; GET /transfers, /extras and /pickup-points; transfer.created and transfer.updated events."
+   ]
+  },
+  {
+   "date": "2026-09-26",
+   "changes": [
+    "Concierge: GET /concierge-requests and /concierge-services; concierge.request_created and concierge.request_updated events. Private (discreet) requests are never included."
    ]
   }
  ],
@@ -650,6 +658,28 @@
         "type": "null"
        }
       ]
+     },
+     "bookingForm": {
+      "oneOf": [
+       {
+        "$ref": "#/components/schemas/BookingFormAnswers"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "extras": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/ExtraLine"
+      }
+     },
+     "transfers": {
+      "type": "array",
+      "items": {
+       "$ref": "#/components/schemas/Transfer"
+      }
      }
     },
     "required": [
@@ -676,7 +706,820 @@
      "externalRef",
      "createdAt",
      "updatedAt",
-     "cancelledAt"
+     "cancelledAt",
+     "bookingForm",
+     "extras",
+     "transfers"
+    ]
+   },
+   "BookingFormAnswers": {
+    "type": "object",
+    "properties": {
+     "formVersionId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "version": {
+      "type": "integer"
+     },
+     "channel": {
+      "type": "string",
+      "enum": [
+       "MARKETPLACE",
+       "BOOKING_SITE",
+       "FRONT_DESK"
+      ]
+     },
+     "answers": {
+      "type": "array",
+      "description": "Answers to the hotel booking form with field metadata. Sensitive answers only with the guests:read scope; files as name, type and size (never a URL).",
+      "items": {
+       "type": "object",
+       "properties": {
+        "key": {
+         "type": "string"
+        },
+        "label": {
+         "type": "string"
+        },
+        "type": {
+         "type": "string"
+        },
+        "section": {
+         "type": "string"
+        },
+        "value": {},
+        "display": {
+         "type": "string"
+        },
+        "sensitive": {
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "key",
+        "label",
+        "type",
+        "section",
+        "value",
+        "display",
+        "sensitive"
+       ]
+      }
+     }
+    },
+    "required": [
+     "formVersionId",
+     "version",
+     "channel",
+     "answers"
+    ]
+   },
+   "ExtraLine": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "extraId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "category": {
+      "type": "string",
+      "enum": [
+       "TRANSPORT",
+       "FOOD",
+       "EARLY_LATE",
+       "CELEBRATION",
+       "WELLNESS",
+       "OTHER"
+      ]
+     },
+     "pricing": {
+      "type": "string",
+      "enum": [
+       "PER_STAY",
+       "PER_NIGHT",
+       "PER_PERSON",
+       "PER_PERSON_PER_NIGHT",
+       "PER_UNIT"
+      ]
+     },
+     "quantity": {
+      "type": "integer"
+     },
+     "unitPriceKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "netKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "taxKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "totalKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "ACTIVE",
+       "CANCELLED"
+      ]
+     },
+     "posted": {
+      "type": "boolean"
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "extraId",
+     "name",
+     "category",
+     "pricing",
+     "quantity",
+     "unitPriceKobo",
+     "netKobo",
+     "taxKobo",
+     "totalKobo",
+     "status",
+     "posted",
+     "createdAt"
+    ]
+   },
+   "Transfer": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "reservationId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "direction": {
+      "type": "string",
+      "enum": [
+       "ARRIVAL",
+       "DEPARTURE"
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "REQUESTED",
+       "CONFIRMED",
+       "DRIVER_ASSIGNED",
+       "EN_ROUTE",
+       "PICKED_UP",
+       "COMPLETED",
+       "NO_SHOW",
+       "CANCELLED"
+      ]
+     },
+     "pickupPoint": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "format": "uuid"
+       },
+       "name": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string",
+        "enum": [
+         "AIRPORT",
+         "MOTOR_PARK",
+         "TRAIN_STATION",
+         "JETTY",
+         "OTHER"
+        ]
+       },
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "name",
+       "kind",
+       "city"
+      ]
+     },
+     "scheduledAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "passengers": {
+      "type": "integer"
+     },
+     "vehicleName": {
+      "type": "string"
+     },
+     "totalKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "detailsSummary": {
+      "type": "string"
+     },
+     "driver": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "name": {
+          "type": "string"
+         },
+         "phone": {
+          "type": "string"
+         },
+         "vehiclePlate": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "name",
+         "phone",
+         "vehiclePlate"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "reservationId",
+     "propertyId",
+     "direction",
+     "status",
+     "pickupPoint",
+     "scheduledAt",
+     "passengers",
+     "vehicleName",
+     "totalKobo",
+     "detailsSummary",
+     "driver",
+     "updatedAt"
+    ]
+   },
+   "Extra": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "category": {
+      "type": "string"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "STANDARD",
+       "EARLY_CHECK_IN",
+       "LATE_CHECK_OUT"
+      ]
+     },
+     "pricing": {
+      "type": "string"
+     },
+     "priceKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "maxUnits": {
+      "oneOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "taxable": {
+      "type": "boolean"
+     },
+     "channels": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "dailyCap": {
+      "oneOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "leadTimeHours": {
+      "type": "integer"
+     },
+     "active": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "propertyId",
+     "name",
+     "description",
+     "category",
+     "kind",
+     "pricing",
+     "priceKobo",
+     "maxUnits",
+     "taxable",
+     "channels",
+     "dailyCap",
+     "leadTimeHours",
+     "active"
+    ]
+   },
+   "ConciergeRequest": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "number": {
+      "type": "string",
+      "examples": [
+       "CR-000123"
+      ]
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "reservationId": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "NEW",
+       "QUOTED",
+       "AWAITING_GUEST",
+       "CONFIRMED",
+       "SCHEDULED",
+       "IN_PROGRESS",
+       "COMPLETED",
+       "DECLINED",
+       "CANCELLED"
+      ]
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "BOOKING_FLOW",
+       "TRIP_PAGE",
+       "WHATSAPP",
+       "FRONT_DESK"
+      ]
+     },
+     "category": {
+      "type": "string"
+     },
+     "serviceId": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "serviceName": {
+      "type": "string"
+     },
+     "partySize": {
+      "oneOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "preferredStart": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "preferredEnd": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "totalKobo": {
+      "oneOf": [
+       {
+        "type": "integer",
+        "description": "Amount in kobo (NGN x 100)"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "paymentMethod": {
+      "oneOf": [
+       {
+        "type": "string",
+        "enum": [
+         "ONLINE",
+         "FOLIO",
+         "NONE"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "paymentStatus": {
+      "type": "string",
+      "enum": [
+       "NONE",
+       "PENDING",
+       "PAID",
+       "POSTED",
+       "REFUNDED"
+      ]
+     },
+     "completedAt": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "propertyId",
+     "reservationId",
+     "status",
+     "source",
+     "category",
+     "serviceId",
+     "serviceName",
+     "partySize",
+     "preferredStart",
+     "preferredEnd",
+     "totalKobo",
+     "paymentMethod",
+     "paymentStatus",
+     "completedAt",
+     "createdAt",
+     "updatedAt"
+    ]
+   },
+   "ConciergeService": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "category": {
+      "type": "string"
+     },
+     "pricing": {
+      "type": "string",
+      "enum": [
+       "FIXED",
+       "FROM",
+       "PER_HOUR",
+       "PER_PERSON",
+       "FREE"
+      ]
+     },
+     "priceKobo": {
+      "oneOf": [
+       {
+        "type": "integer",
+        "description": "Amount in kobo (NGN x 100)"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "variants": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "priceKobo": {
+         "type": "integer",
+         "description": "Amount in kobo (NGN x 100)"
+        },
+        "durationMinutes": {
+         "oneOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "id",
+        "name",
+        "priceKobo",
+        "durationMinutes"
+       ]
+      }
+     },
+     "durationMinutes": {
+      "oneOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "location": {
+      "type": "string",
+      "enum": [
+       "IN_ROOM",
+       "ON_PROPERTY",
+       "OFF_PROPERTY"
+      ]
+     },
+     "active": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "propertyId",
+     "name",
+     "description",
+     "category",
+     "pricing",
+     "priceKobo",
+     "variants",
+     "durationMinutes",
+     "location",
+     "active"
+    ]
+   },
+   "PickupPoint": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "name": {
+      "type": "string"
+     },
+     "shortName": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "AIRPORT",
+       "MOTOR_PARK",
+       "TRAIN_STATION",
+       "JETTY",
+       "OTHER"
+      ]
+     },
+     "city": {
+      "type": "string"
+     },
+     "address": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "priceKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "dropOffPriceKobo": {
+      "oneOf": [
+       {
+        "type": "integer",
+        "description": "Amount in kobo (NGN x 100)"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "vehicleOptions": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string"
+        },
+        "name": {
+         "type": "string"
+        },
+        "maxPassengers": {
+         "type": "integer"
+        },
+        "priceKobo": {
+         "oneOf": [
+          {
+           "type": "integer",
+           "description": "Amount in kobo (NGN x 100)"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "id",
+        "name",
+        "maxPassengers",
+        "priceKobo"
+       ]
+      }
+     },
+     "leadTimeHours": {
+      "type": "integer"
+     },
+     "operatingHours": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "open": {
+          "type": "string"
+         },
+         "close": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "open",
+         "close"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "notesForGuest": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "taxable": {
+      "type": "boolean"
+     },
+     "active": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "propertyId",
+     "name",
+     "shortName",
+     "kind",
+     "city",
+     "address",
+     "priceKobo",
+     "dropOffPriceKobo",
+     "vehicleOptions",
+     "leadTimeHours",
+     "operatingHours",
+     "notesForGuest",
+     "taxable",
+     "active"
     ]
    },
    "Guest": {
@@ -1165,6 +2008,202 @@
     },
     "required": []
    },
+   "PaymentReceived": {
+    "type": "object",
+    "properties": {
+     "reservationId": {
+      "oneOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "folioId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "entryId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "amountKobo": {
+      "type": "integer",
+      "description": "Amount in kobo (NGN x 100)"
+     },
+     "method": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "reference": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "receivedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "reservationId",
+     "folioId",
+     "entryId",
+     "amountKobo",
+     "method",
+     "reference",
+     "receivedAt"
+    ]
+   },
+   "RoomStatusChanged": {
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Room"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "previousStatus": {
+        "oneOf": [
+         {
+          "$ref": "#/components/schemas/RoomStatus"
+         },
+         {
+          "type": "null"
+         }
+        ]
+       }
+      },
+      "required": [
+       "previousStatus"
+      ]
+     }
+    ]
+   },
+   "ReviewPublished": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "overall": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+     },
+     "title": {
+      "oneOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "body": {
+      "type": "string"
+     },
+     "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "propertyId",
+     "overall",
+     "title",
+     "body",
+     "publishedAt"
+    ]
+   },
+   "GuardFlagRaised": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "propertyId": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "rule": {
+      "type": "string"
+     },
+     "severity": {
+      "type": "string",
+      "enum": [
+       "LOW",
+       "MEDIUM",
+       "HIGH"
+      ]
+     },
+     "title": {
+      "type": "string"
+     },
+     "amountKobo": {
+      "oneOf": [
+       {
+        "type": "integer",
+        "description": "Amount in kobo (NGN x 100)"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "createdAt": {
+      "type": "string",
+      "format": "date-time"
+     }
+    },
+    "required": [
+     "id",
+     "propertyId",
+     "rule",
+     "severity",
+     "title",
+     "amountKobo",
+     "createdAt"
+    ]
+   },
+   "Ping": {
+    "type": "object",
+    "properties": {
+     "message": {
+      "type": "string"
+     },
+     "endpointId": {
+      "type": "string",
+      "format": "uuid"
+     }
+    },
+    "required": [
+     "message",
+     "endpointId"
+    ]
+   },
    "Event": {
     "type": "object",
     "properties": {
@@ -1188,6 +2227,10 @@
        "housekeeping.task_completed",
        "review.published",
        "guard.flag_raised",
+       "transfer.created",
+       "transfer.updated",
+       "concierge.request_created",
+       "concierge.request_updated",
        "webhook.ping"
       ]
      },
@@ -1239,18 +2282,594 @@
      "propertyId",
      "data"
     ]
+   },
+   "ReservationCreatedEvent": {
+    "description": "A reservation was created (front desk, booking site, marketplace, OTA or API)",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.created"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReservationUpdatedEvent": {
+    "description": "Dates, guests, room or price of a reservation changed",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.updated"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReservationCancelledEvent": {
+    "description": "A reservation was cancelled",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.cancelled"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReservationCheckedInEvent": {
+    "description": "The guest checked in",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.checked_in"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReservationCheckedOutEvent": {
+    "description": "The guest checked out",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.checked_out"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReservationNoShowEvent": {
+    "description": "The reservation was marked as a no-show",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "reservation.no_show"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Reservation"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "PaymentReceivedEvent": {
+    "description": "A payment was recorded on a reservation folio",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "payment.received"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/PaymentReceived"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "RoomStatusChangedEvent": {
+    "description": "A room changed status (clean, dirty, out of order ...)",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "room.status_changed"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/RoomStatusChanged"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "HousekeepingTaskCompletedEvent": {
+    "description": "A housekeeping task was marked done",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "housekeeping.task_completed"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/HousekeepingTask"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ReviewPublishedEvent": {
+    "description": "A guest review was published",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "review.published"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/ReviewPublished"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "GuardFlagRaisedEvent": {
+    "description": "Revenue Guard raised a flag",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "guard.flag_raised"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/GuardFlagRaised"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "TransferCreatedEvent": {
+    "description": "An arrival pickup or departure drop-off was booked",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "transfer.created"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Transfer"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "TransferUpdatedEvent": {
+    "description": "A transfer changed: confirmed, driver assigned, on the way, completed, delayed or cancelled",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "transfer.updated"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Transfer"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ConciergeRequestCreatedEvent": {
+    "description": "A guest concierge request was made (private requests are never sent)",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "concierge.request_created"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/ConciergeRequest"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "ConciergeRequestUpdatedEvent": {
+    "description": "A concierge request changed: quoted, confirmed, paid, scheduled, completed, declined or cancelled (private requests are never sent)",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "concierge.request_updated"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/ConciergeRequest"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
+   },
+   "WebhookPingEvent": {
+    "description": "Test event sent from the settings page",
+    "allOf": [
+     {
+      "$ref": "#/components/schemas/Event"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "const": "webhook.ping"
+       },
+       "data": {
+        "type": "object",
+        "properties": {
+         "object": {
+          "$ref": "#/components/schemas/Ping"
+         }
+        },
+        "required": [
+         "object"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "data"
+      ]
+     }
+    ]
    }
   }
  },
+ "tags": [
+  {
+   "name": "Key",
+   "description": "The API key in use and its hotel."
+  },
+  {
+   "name": "Properties",
+   "description": "Properties (hotels of the group) the key may access."
+  },
+  {
+   "name": "Room types",
+   "description": "Sellable room categories of each property."
+  },
+  {
+   "name": "Rooms",
+   "description": "Physical rooms and their housekeeping status."
+  },
+  {
+   "name": "Availability",
+   "description": "Rooms free to sell per room type and night."
+  },
+  {
+   "name": "Rates",
+   "description": "Resolved nightly rates, restrictions and date overrides."
+  },
+  {
+   "name": "Reservations",
+   "description": "Bookings: list, read, create, change and cancel."
+  },
+  {
+   "name": "Folios",
+   "description": "Charges and payments of a reservation."
+  },
+  {
+   "name": "Guests",
+   "description": "Guest profiles (names and contact details only)."
+  },
+  {
+   "name": "Housekeeping",
+   "description": "Housekeeping tasks."
+  },
+  {
+   "name": "Extras and pickups",
+   "description": "Paid extras, pickup points and airport / motor-park / station transfers."
+  },
+  {
+   "name": "Concierge",
+   "description": "Lawful guest requests arranged by the hotel (private requests are never included)."
+  },
+  {
+   "name": "Reports",
+   "description": "Daily occupancy, ADR, RevPAR and revenue."
+  },
+  {
+   "name": "Webhooks",
+   "description": "Endpoints that receive signed event notifications."
+  }
+ ],
  "paths": {
   "/me": {
    "get": {
+    "operationId": "getMe",
+    "tags": [
+     "Key"
+    ],
     "summary": "The API key and its hotel",
+    "description": "Any valid API key.",
     "security": [
      {
       "bearerAuth": []
      }
     ],
+    "x-scopes": [],
     "responses": {
      "200": {
       "description": "OK",
@@ -1391,12 +3010,18 @@
   },
   "/properties": {
    "get": {
+    "operationId": "listProperties",
+    "tags": [
+     "Properties"
+    ],
     "summary": "Properties the key may access",
+    "description": "Any valid API key.",
     "security": [
      {
       "bearerAuth": []
      }
     ],
+    "x-scopes": [],
     "responses": {
      "200": {
       "description": "OK",
@@ -1561,12 +3186,18 @@
   },
   "/properties/{id}": {
    "get": {
+    "operationId": "getProperty",
+    "tags": [
+     "Properties"
+    ],
     "summary": "One property",
+    "description": "Any valid API key.",
     "security": [
      {
       "bearerAuth": []
      }
     ],
+    "x-scopes": [],
     "responses": {
      "200": {
       "description": "OK",
@@ -1717,12 +3348,18 @@
   },
   "/room-types": {
    "get": {
+    "operationId": "listRoomTypes",
+    "tags": [
+     "Room types"
+    ],
     "summary": "Room types",
+    "description": "Any valid API key.",
     "security": [
      {
       "bearerAuth": []
      }
     ],
+    "x-scopes": [],
     "responses": {
      "200": {
       "description": "OK",
@@ -1896,12 +3533,18 @@
   },
   "/room-types/{id}": {
    "get": {
+    "operationId": "getRoomType",
+    "tags": [
+     "Room types"
+    ],
     "summary": "One room type",
+    "description": "Any valid API key.",
     "security": [
      {
       "bearerAuth": []
      }
     ],
+    "x-scopes": [],
     "responses": {
      "200": {
       "description": "OK",
@@ -2052,12 +3695,21 @@
   },
   "/rooms": {
    "get": {
+    "operationId": "listRooms",
+    "tags": [
+     "Rooms"
+    ],
     "summary": "Rooms",
     "description": "Scope: `rooms:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rooms:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rooms:read"
     ],
     "responses": {
      "200": {
@@ -2249,12 +3901,21 @@
   },
   "/rooms/{id}": {
    "get": {
+    "operationId": "getRoom",
+    "tags": [
+     "Rooms"
+    ],
     "summary": "One room",
     "description": "Scope: `rooms:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rooms:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rooms:read"
     ],
     "responses": {
      "200": {
@@ -2406,12 +4067,21 @@
   },
   "/rooms/{id}/status": {
    "patch": {
+    "operationId": "updateRoomStatus",
+    "tags": [
+     "Rooms"
+    ],
     "summary": "Change a room status",
     "description": "Scope: `rooms:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rooms:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rooms:write"
     ],
     "responses": {
      "200": {
@@ -2595,12 +4265,21 @@
   },
   "/availability": {
    "get": {
+    "operationId": "getAvailability",
+    "tags": [
+     "Availability"
+    ],
     "summary": "Availability per room type and night (max 180 nights)",
     "description": "Scope: `availability:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "availability:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "availability:read"
     ],
     "responses": {
      "200": {
@@ -2781,12 +4460,21 @@
   },
   "/rates": {
    "get": {
+    "operationId": "listRates",
+    "tags": [
+     "Rates"
+    ],
     "summary": "Resolved nightly rates (max 180 nights)",
     "description": "Scope: `rates:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rates:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rates:read"
     ],
     "responses": {
      "200": {
@@ -2975,12 +4663,21 @@
   },
   "/rates/overrides": {
    "put": {
+    "operationId": "setRateOverrides",
+    "tags": [
+     "Rates"
+    ],
     "summary": "Set a date override per night (inclusive range, max 366)",
     "description": "Scope: `rates:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rates:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rates:write"
     ],
     "responses": {
      "200": {
@@ -3185,12 +4882,21 @@
     }
    },
    "delete": {
+    "operationId": "clearRateOverrides",
+    "tags": [
+     "Rates"
+    ],
     "summary": "Clear date overrides",
     "description": "Scope: `rates:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "rates:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "rates:write"
     ],
     "responses": {
      "200": {
@@ -3391,12 +5097,21 @@
   },
   "/reservations": {
    "get": {
+    "operationId": "listReservations",
+    "tags": [
+     "Reservations"
+    ],
     "summary": "Reservations (ordered by createdAt, id)",
     "description": "Scope: `reservations:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reservations:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reservations:read"
     ],
     "responses": {
      "200": {
@@ -3606,12 +5321,21 @@
     ]
    },
    "post": {
+    "operationId": "createReservation",
+    "tags": [
+     "Reservations"
+    ],
     "summary": "Create a reservation (NIGHTLY, CONFIRMED, source API)",
     "description": "Scope: `reservations:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reservations:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reservations:write"
     ],
     "responses": {
      "201": {
@@ -3776,12 +5500,21 @@
   },
   "/reservations/{id}": {
    "get": {
+    "operationId": "getReservation",
+    "tags": [
+     "Reservations"
+    ],
     "summary": "One reservation (id or code)",
     "description": "Scope: `reservations:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reservations:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reservations:read"
     ],
     "responses": {
      "200": {
@@ -3931,12 +5664,21 @@
     ]
    },
    "patch": {
+    "operationId": "updateReservation",
+    "tags": [
+     "Reservations"
+    ],
     "summary": "Change dates, guests, notes or external reference (availability re-checked)",
     "description": "Scope: `reservations:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reservations:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reservations:write"
     ],
     "responses": {
      "200": {
@@ -4109,12 +5851,21 @@
   },
   "/reservations/{id}/cancel": {
    "post": {
+    "operationId": "cancelReservation",
+    "tags": [
+     "Reservations"
+    ],
     "summary": "Cancel a reservation",
     "description": "Scope: `reservations:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reservations:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reservations:write"
     ],
     "responses": {
      "200": {
@@ -4292,12 +6043,21 @@
   },
   "/reservations/{id}/folio": {
    "get": {
+    "operationId": "getReservationFolio",
+    "tags": [
+     "Folios"
+    ],
     "summary": "Folio of a reservation",
     "description": "Scope: `folios:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "folios:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "folios:read"
     ],
     "responses": {
      "200": {
@@ -4449,12 +6209,21 @@
   },
   "/guests": {
    "get": {
+    "operationId": "listGuests",
+    "tags": [
+     "Guests"
+    ],
     "summary": "Guests (limited PII)",
     "description": "Scope: `guests:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "guests:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "guests:read"
     ],
     "responses": {
      "200": {
@@ -4629,12 +6398,21 @@
   },
   "/guests/{id}": {
    "get": {
+    "operationId": "getGuest",
+    "tags": [
+     "Guests"
+    ],
     "summary": "One guest",
     "description": "Scope: `guests:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "guests:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "guests:read"
     ],
     "responses": {
      "200": {
@@ -4786,12 +6564,21 @@
   },
   "/housekeeping/tasks": {
    "get": {
+    "operationId": "listHousekeepingTasks",
+    "tags": [
+     "Housekeeping"
+    ],
     "summary": "Housekeeping tasks",
     "description": "Scope: `housekeeping:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "housekeeping:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "housekeeping:read"
     ],
     "responses": {
      "200": {
@@ -4984,12 +6771,21 @@
   },
   "/housekeeping/tasks/{id}/complete": {
    "post": {
+    "operationId": "completeHousekeepingTask",
+    "tags": [
+     "Housekeeping"
+    ],
     "summary": "Mark a task done",
     "description": "Scope: `housekeeping:write`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "housekeeping:write"
+      ]
      }
+    ],
+    "x-scopes": [
+     "housekeeping:write"
     ],
     "responses": {
      "200": {
@@ -5167,12 +6963,21 @@
   },
   "/reports/daily": {
    "get": {
+    "operationId": "getDailyReport",
+    "tags": [
+     "Reports"
+    ],
     "summary": "Daily stats for one date or a range",
     "description": "Scope: `reports:read`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "reports:read"
+      ]
      }
+    ],
+    "x-scopes": [
+     "reports:read"
     ],
     "responses": {
      "200": {
@@ -5363,14 +7168,1024 @@
     ]
    }
   },
+  "/transfers": {
+   "get": {
+    "operationId": "listTransfers",
+    "tags": [
+     "Extras and pickups"
+    ],
+    "summary": "Arrival pickups and departure drop-offs (by scheduled time)",
+    "description": "Scope: `reservations:read`",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:read"
+      ]
+     }
+    ],
+    "x-scopes": [
+     "reservations:read"
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "RateLimit-Limit": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests allowed per minute for this key"
+       },
+       "RateLimit-Remaining": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests left in the current minute"
+       },
+       "RateLimit-Reset": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Seconds until the minute window resets"
+       },
+       "RateLimit-Policy": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "e.g. \"600;w=60, 50;w=1\""
+       },
+       "X-Request-Id": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "Request id (echoes a client X-Request-Id)"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Transfer"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error (VALIDATION_ERROR, IDEMPOTENCY_KEY_REQUIRED)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "INVALID_API_KEY",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "402": {
+      "description": "SUBSCRIPTION_READ_ONLY (writes)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "INSUFFICIENT_SCOPE, IP_NOT_ALLOWED, FEATURE_LOCKED, PROPERTY_ACCESS_DENIED",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "NOT_FOUND",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "ROOM_UNAVAILABLE, INVALID_STATE, TENANT_MIGRATING",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "IDEMPOTENCY_CONFLICT",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "RATE_LIMITED (see Retry-After)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "YYYY-MM-DD (Africa/Lagos)"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "YYYY-MM-DD (Africa/Lagos)"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/extras": {
+   "get": {
+    "operationId": "listExtras",
+    "tags": [
+     "Extras and pickups"
+    ],
+    "summary": "Paid extras",
+    "description": "Scope: `rates:read`",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:read"
+      ]
+     }
+    ],
+    "x-scopes": [
+     "rates:read"
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "RateLimit-Limit": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests allowed per minute for this key"
+       },
+       "RateLimit-Remaining": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests left in the current minute"
+       },
+       "RateLimit-Reset": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Seconds until the minute window resets"
+       },
+       "RateLimit-Policy": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "e.g. \"600;w=60, 50;w=1\""
+       },
+       "X-Request-Id": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "Request id (echoes a client X-Request-Id)"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/Extra"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error (VALIDATION_ERROR, IDEMPOTENCY_KEY_REQUIRED)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "INVALID_API_KEY",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "402": {
+      "description": "SUBSCRIPTION_READ_ONLY (writes)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "INSUFFICIENT_SCOPE, IP_NOT_ALLOWED, FEATURE_LOCKED, PROPERTY_ACCESS_DENIED",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "NOT_FOUND",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "ROOM_UNAVAILABLE, INVALID_STATE, TENANT_MIGRATING",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "IDEMPOTENCY_CONFLICT",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "RATE_LIMITED (see Retry-After)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/pickup-points": {
+   "get": {
+    "operationId": "listPickupPoints",
+    "tags": [
+     "Extras and pickups"
+    ],
+    "summary": "Pickup points (airports, motor parks, stations, jetties)",
+    "description": "Scope: `rates:read`",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:read"
+      ]
+     }
+    ],
+    "x-scopes": [
+     "rates:read"
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "RateLimit-Limit": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests allowed per minute for this key"
+       },
+       "RateLimit-Remaining": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests left in the current minute"
+       },
+       "RateLimit-Reset": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Seconds until the minute window resets"
+       },
+       "RateLimit-Policy": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "e.g. \"600;w=60, 50;w=1\""
+       },
+       "X-Request-Id": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "Request id (echoes a client X-Request-Id)"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/PickupPoint"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error (VALIDATION_ERROR, IDEMPOTENCY_KEY_REQUIRED)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "INVALID_API_KEY",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "402": {
+      "description": "SUBSCRIPTION_READ_ONLY (writes)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "INSUFFICIENT_SCOPE, IP_NOT_ALLOWED, FEATURE_LOCKED, PROPERTY_ACCESS_DENIED",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "NOT_FOUND",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "ROOM_UNAVAILABLE, INVALID_STATE, TENANT_MIGRATING",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "IDEMPOTENCY_CONFLICT",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "RATE_LIMITED (see Retry-After)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/concierge-requests": {
+   "get": {
+    "operationId": "listConciergeRequests",
+    "tags": [
+     "Concierge"
+    ],
+    "summary": "Concierge requests (never private ones)",
+    "description": "Scope: `reservations:read`",
+    "security": [
+     {
+      "bearerAuth": [
+       "reservations:read"
+      ]
+     }
+    ],
+    "x-scopes": [
+     "reservations:read"
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "RateLimit-Limit": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests allowed per minute for this key"
+       },
+       "RateLimit-Remaining": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests left in the current minute"
+       },
+       "RateLimit-Reset": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Seconds until the minute window resets"
+       },
+       "RateLimit-Policy": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "e.g. \"600;w=60, 50;w=1\""
+       },
+       "X-Request-Id": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "Request id (echoes a client X-Request-Id)"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/ConciergeRequest"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error (VALIDATION_ERROR, IDEMPOTENCY_KEY_REQUIRED)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "INVALID_API_KEY",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "402": {
+      "description": "SUBSCRIPTION_READ_ONLY (writes)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "INSUFFICIENT_SCOPE, IP_NOT_ALLOWED, FEATURE_LOCKED, PROPERTY_ACCESS_DENIED",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "NOT_FOUND",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "ROOM_UNAVAILABLE, INVALID_STATE, TENANT_MIGRATING",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "IDEMPOTENCY_CONFLICT",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "RATE_LIMITED (see Retry-After)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     },
+     {
+      "name": "from",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "YYYY-MM-DD (Africa/Lagos)"
+      }
+     },
+     {
+      "name": "to",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "date",
+       "description": "YYYY-MM-DD (Africa/Lagos)"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
+  "/concierge-services": {
+   "get": {
+    "operationId": "listConciergeServices",
+    "tags": [
+     "Concierge"
+    ],
+    "summary": "Live concierge services",
+    "description": "Scope: `rates:read`",
+    "security": [
+     {
+      "bearerAuth": [
+       "rates:read"
+      ]
+     }
+    ],
+    "x-scopes": [
+     "rates:read"
+    ],
+    "responses": {
+     "200": {
+      "description": "OK",
+      "headers": {
+       "RateLimit-Limit": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests allowed per minute for this key"
+       },
+       "RateLimit-Remaining": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Requests left in the current minute"
+       },
+       "RateLimit-Reset": {
+        "schema": {
+         "type": "integer"
+        },
+        "description": "Seconds until the minute window resets"
+       },
+       "RateLimit-Policy": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "e.g. \"600;w=60, 50;w=1\""
+       },
+       "X-Request-Id": {
+        "schema": {
+         "type": "string"
+        },
+        "description": "Request id (echoes a client X-Request-Id)"
+       }
+      },
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "data": {
+           "type": "array",
+           "items": {
+            "$ref": "#/components/schemas/ConciergeService"
+           }
+          },
+          "pagination": {
+           "$ref": "#/components/schemas/Pagination"
+          }
+         },
+         "required": [
+          "data",
+          "pagination"
+         ]
+        }
+       }
+      }
+     },
+     "400": {
+      "description": "Validation error (VALIDATION_ERROR, IDEMPOTENCY_KEY_REQUIRED)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "INVALID_API_KEY",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "402": {
+      "description": "SUBSCRIPTION_READ_ONLY (writes)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "403": {
+      "description": "INSUFFICIENT_SCOPE, IP_NOT_ALLOWED, FEATURE_LOCKED, PROPERTY_ACCESS_DENIED",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "NOT_FOUND",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "ROOM_UNAVAILABLE, INVALID_STATE, TENANT_MIGRATING",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "IDEMPOTENCY_CONFLICT",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     },
+     "429": {
+      "description": "RATE_LIMITED (see Retry-After)",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "propertyId",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "format": "uuid"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 200,
+       "default": 50
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ]
+   }
+  },
   "/webhook-endpoints": {
    "get": {
+    "operationId": "listWebhookEndpoints",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Webhook endpoints",
     "description": "Scope: `webhooks:manage`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
      }
+    ],
+    "x-scopes": [
+     "webhooks:manage"
     ],
     "responses": {
      "200": {
@@ -5509,12 +8324,21 @@
     }
    },
    "post": {
+    "operationId": "createWebhookEndpoint",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Create a webhook endpoint (the secret is returned once)",
     "description": "Scope: `webhooks:manage`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
      }
+    ],
+    "x-scopes": [
+     "webhooks:manage"
     ],
     "responses": {
      "201": {
@@ -5724,12 +8548,21 @@
   },
   "/webhook-endpoints/{id}": {
    "patch": {
+    "operationId": "updateWebhookEndpoint",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Change a webhook endpoint",
     "description": "Scope: `webhooks:manage`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
      }
+    ],
+    "x-scopes": [
+     "webhooks:manage"
     ],
     "responses": {
      "200": {
@@ -5900,12 +8733,21 @@
     }
    },
    "delete": {
+    "operationId": "deleteWebhookEndpoint",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Delete a webhook endpoint",
     "description": "Scope: `webhooks:manage`",
     "security": [
      {
-      "bearerAuth": []
+      "bearerAuth": [
+       "webhooks:manage"
+      ]
      }
+    ],
+    "x-scopes": [
+     "webhooks:manage"
     ],
     "responses": {
      "200": {
@@ -6078,13 +8920,18 @@
  "webhooks": {
   "reservation.created": {
    "post": {
+    "operationId": "onReservationCreated",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A reservation was created (front desk, booking site, marketplace, OTA or API)",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationCreatedEvent"
        }
       }
      }
@@ -6098,13 +8945,18 @@
   },
   "reservation.updated": {
    "post": {
+    "operationId": "onReservationUpdated",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Dates, guests, room or price of a reservation changed",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationUpdatedEvent"
        }
       }
      }
@@ -6118,13 +8970,18 @@
   },
   "reservation.cancelled": {
    "post": {
+    "operationId": "onReservationCancelled",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A reservation was cancelled",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationCancelledEvent"
        }
       }
      }
@@ -6138,13 +8995,18 @@
   },
   "reservation.checked_in": {
    "post": {
+    "operationId": "onReservationCheckedIn",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "The guest checked in",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationCheckedInEvent"
        }
       }
      }
@@ -6158,13 +9020,18 @@
   },
   "reservation.checked_out": {
    "post": {
+    "operationId": "onReservationCheckedOut",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "The guest checked out",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationCheckedOutEvent"
        }
       }
      }
@@ -6178,13 +9045,18 @@
   },
   "reservation.no_show": {
    "post": {
+    "operationId": "onReservationNoShow",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "The reservation was marked as a no-show",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReservationNoShowEvent"
        }
       }
      }
@@ -6198,13 +9070,18 @@
   },
   "payment.received": {
    "post": {
+    "operationId": "onPaymentReceived",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A payment was recorded on a reservation folio",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/PaymentReceivedEvent"
        }
       }
      }
@@ -6218,13 +9095,18 @@
   },
   "room.status_changed": {
    "post": {
+    "operationId": "onRoomStatusChanged",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A room changed status (clean, dirty, out of order ...)",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/RoomStatusChangedEvent"
        }
       }
      }
@@ -6238,13 +9120,18 @@
   },
   "housekeeping.task_completed": {
    "post": {
+    "operationId": "onHousekeepingTaskCompleted",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A housekeeping task was marked done",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/HousekeepingTaskCompletedEvent"
        }
       }
      }
@@ -6258,13 +9145,18 @@
   },
   "review.published": {
    "post": {
+    "operationId": "onReviewPublished",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "A guest review was published",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/ReviewPublishedEvent"
        }
       }
      }
@@ -6278,13 +9170,118 @@
   },
   "guard.flag_raised": {
    "post": {
+    "operationId": "onGuardFlagRaised",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Revenue Guard raised a flag",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/GuardFlagRaisedEvent"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Received"
+     }
+    }
+   }
+  },
+  "transfer.created": {
+   "post": {
+    "operationId": "onTransferCreated",
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "An arrival pickup or departure drop-off was booked",
+    "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TransferCreatedEvent"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Received"
+     }
+    }
+   }
+  },
+  "transfer.updated": {
+   "post": {
+    "operationId": "onTransferUpdated",
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "A transfer changed: confirmed, driver assigned, on the way, completed, delayed or cancelled",
+    "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TransferUpdatedEvent"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Received"
+     }
+    }
+   }
+  },
+  "concierge.request_created": {
+   "post": {
+    "operationId": "onConciergeRequestCreated",
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "A guest concierge request was made (private requests are never sent)",
+    "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConciergeRequestCreatedEvent"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Received"
+     }
+    }
+   }
+  },
+  "concierge.request_updated": {
+   "post": {
+    "operationId": "onConciergeRequestUpdated",
+    "tags": [
+     "Webhooks"
+    ],
+    "summary": "A concierge request changed: quoted, confirmed, paid, scheduled, completed, declined or cancelled (private requests are never sent)",
+    "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConciergeRequestUpdatedEvent"
        }
       }
      }
@@ -6298,13 +9295,18 @@
   },
   "webhook.ping": {
    "post": {
+    "operationId": "onWebhookPing",
+    "tags": [
+     "Webhooks"
+    ],
     "summary": "Test event sent from the settings page",
     "description": "Headers: X-Webhook-Id, X-Event-Id, X-Event-Type, X-Signature `t=<unix>,v1=<hex HMAC-SHA256(secret, \"<t>.<raw body>\")>` (a second v1 during secret rotation). Answer 2xx within 10 s. Retries after 1 min, 5 min, 30 min, 2 h, 5 h, 10 h and 24 h.",
     "requestBody": {
+     "required": true,
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Event"
+        "$ref": "#/components/schemas/WebhookPingEvent"
        }
       }
      }
