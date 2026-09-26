@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
     qualities: [60, 75, 85],
   },
   poweredByHeader: false,
+  // Self-contained server for the Docker image (.next/standalone); Vercel ignores it.
+  output: "standalone",
 };
 
 export default nextConfig;
