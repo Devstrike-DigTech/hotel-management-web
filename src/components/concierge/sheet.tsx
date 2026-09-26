@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, BellSimple, ChatCircleDots, LockSimple, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
-import { byCategory, CATEGORY_NAME, durationLine, priceLine, type ConciergeCategory, type ConciergeRequestView, type ConciergeService, type ContactPreference } from "@/lib/concierge";
+import { byCategory, CATEGORY_NAME, serviceDuration, priceLine, type ConciergeCategory, type ConciergeRequestView, type ConciergeService, type ContactPreference } from "@/lib/concierge";
 import { CategoryIcon } from "./category-icon";
 import { RequestForm, type DraftRequest, type RequestContext } from "./request-form";
 
@@ -140,7 +140,7 @@ export function ConciergeSheet({
                         {s.name}
                         {s.discreetEligible ? <LockSimple size={13} className="text-ink-muted" aria-label="Can be kept private" /> : null}
                       </span>
-                      <span className="mt-0.5 block truncate text-sm text-ink-muted">{[durationLine(s.durationMinutes), s.description].filter(Boolean).join(" · ")}</span>
+                      <span className="mt-0.5 block truncate text-sm text-ink-muted">{[serviceDuration(s), s.description].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className="num shrink-0 text-sm">{priceLine(s)}</span>
                     <ArrowRight size={15} aria-hidden className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5" />

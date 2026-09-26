@@ -9,7 +9,7 @@ import {
   byCategory,
   CATEGORY_LINE,
   clock12,
-  durationLine,
+  serviceDuration,
   LOCATION_LINE,
   priceLine,
   PRIVACY_NOTE,
@@ -157,7 +157,7 @@ function CategoryHead({ look, n, id, label, line }: { look: TemplateId; n: numbe
 }
 
 function ServiceItem({ s, href, look }: { s: ConciergeService; href: string; look: TemplateId }) {
-  const meta = [durationLine(s.durationMinutes), LOCATION_LINE[s.location]].filter(Boolean).join(" · ");
+  const meta = [serviceDuration(s), LOCATION_LINE[s.location]].filter(Boolean).join(" · ");
   const lock = s.discreetEligible ? <LockSimple size={13} className="text-ink-muted" aria-label="Can be kept private" /> : null;
   switch (look) {
     case "resort":
@@ -340,7 +340,7 @@ export function ConciergeServicePage({
 }: Omit<PageProps, "catalogue"> & { service: ConciergeService; whiteLabel: boolean }) {
   const I = CATEGORY_ICON[s.category];
   const facts: [React.ReactNode, string, string][] = [
-    [<Timer key="t" size={18} weight="light" aria-hidden />, "How long", s.variants.length > 1 ? s.variants.map((v) => v.name).join(" or ") : (durationLine(s.durationMinutes) ?? "As long as it takes")],
+    [<Timer key="t" size={18} weight="light" aria-hidden />, "How long", s.variants.length > 1 ? s.variants.map((v) => v.name).join(" or ") : (serviceDuration(s) ?? "As long as it takes")],
     [<MapPin key="m" size={18} weight="light" aria-hidden />, "Where", LOCATION_LINE[s.location]],
     [<Clock key="c" size={18} weight="light" aria-hidden />, "When", `${hoursLine(s)}${s.leadTimeHours ? `; ${s.leadTimeHours === 1 ? "an hour" : `${s.leadTimeHours} hours`} notice` : ""}`],
   ];

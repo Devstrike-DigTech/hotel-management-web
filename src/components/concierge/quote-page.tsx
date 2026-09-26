@@ -197,7 +197,7 @@ export function QuotePage({ token, branded = false }: { token: string; branded?:
       ) : null}
 
       <article className="mt-10 overflow-hidden rounded-md border border-line-strong bg-surface shadow-[var(--shadow-card)]" data-testid="quote-card">
-        <header className="flex items-start justify-between gap-4 border-b border-line px-6 py-5 sm:px-8">
+        <header className="flex flex-col-reverse items-start justify-between gap-4 border-b border-line px-6 py-5 sm:flex-row sm:px-8">
           <div className="flex min-w-0 items-start gap-4">
             <span className="mt-0.5 grid size-11 shrink-0 place-items-center rounded-sm bg-surface-2 text-laterite">
               <CategoryIcon category={r.category} size={22} />
@@ -207,7 +207,7 @@ export function QuotePage({ token, branded = false }: { token: string; branded?:
               <p className="mt-1 text-sm text-ink-muted">{[r.variant, when, r.partySize ? `${r.partySize} ${r.partySize === 1 ? "person" : "people"}` : null, r.hours ? `${r.hours} hours` : null].filter(Boolean).join(" · ")}</p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
+          <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end sm:gap-2">
             <RequestStatusChip request={r} />
             <span className="num text-xs text-ink-muted">{r.number}</span>
           </div>
@@ -386,7 +386,7 @@ export function QuotePage({ token, branded = false }: { token: string; branded?:
       {tel ? (
         <p className="mt-6 flex items-center gap-2 text-sm text-ink-muted">
           <Phone size={15} aria-hidden /> Questions? Call the front desk on{" "}
-          <a href={`tel:${tel}`} className="num link-static text-ink">
+          <a href={`tel:${tel}`} className="num link-static whitespace-nowrap text-ink">
             {formatPhone(hotel.phone!)}
           </a>
         </p>

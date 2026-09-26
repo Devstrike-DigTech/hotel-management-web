@@ -23,7 +23,7 @@ import {
   Wine,
 } from "@phosphor-icons/react/ssr";
 import type { Icon } from "@phosphor-icons/react";
-import { byCategory, CATEGORY_NAME, durationLine, LOCATION_LINE, priceLine, type ConciergeCatalogue, type ConciergeCategory, type ConciergeService } from "@/lib/concierge";
+import { byCategory, CATEGORY_NAME, serviceDuration, LOCATION_LINE, priceLine, type ConciergeCatalogue, type ConciergeCategory, type ConciergeService } from "@/lib/concierge";
 import { slugify } from "@/lib/format";
 import type { TemplateId } from "@/lib/theme/types";
 import { Plate } from "../ui/plate";
@@ -64,7 +64,7 @@ function featured(services: ConciergeService[], n: number) {
 }
 
 function meta(s: ConciergeService) {
-  return [durationLine(s.durationMinutes), LOCATION_LINE[s.location]].filter(Boolean).join(" · ");
+  return [serviceDuration(s), LOCATION_LINE[s.location]].filter(Boolean).join(" · ");
 }
 
 export function ConciergeShowcase({
@@ -160,7 +160,7 @@ export function ConciergeShowcase({
                       </a>
                       <span className="block pl-6 text-[12.5px] text-ink-muted">{CATEGORY_NAME[s.category]}</span>
                     </td>
-                    <td className="num py-2.5 text-ink-muted max-sm:hidden">{durationLine(s.durationMinutes) ?? "As needed"}</td>
+                    <td className="num py-2.5 text-ink-muted max-sm:hidden">{serviceDuration(s) ?? "As needed"}</td>
                     <td className="num py-2.5 text-right">{priceLine(s)}</td>
                   </tr>
                 );
@@ -195,7 +195,7 @@ export function ConciergeShowcase({
                     {s.description ? <p className="mt-2 line-clamp-2 text-[0.9375rem] leading-relaxed text-ink-muted">{s.description}</p> : null}
                     <p className="mt-3 flex flex-wrap gap-2 text-[12.5px]">
                       <span className="num rounded-full bg-surface-2 px-3 py-1">{priceLine(s)}</span>
-                      {durationLine(s.durationMinutes) ? <span className="rounded-full bg-surface-2 px-3 py-1">{durationLine(s.durationMinutes)}</span> : null}
+                      {serviceDuration(s) ? <span className="rounded-full bg-surface-2 px-3 py-1">{serviceDuration(s)}</span> : null}
                     </p>
                   </div>
                 </a>

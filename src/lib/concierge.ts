@@ -461,6 +461,13 @@ export function estimateKobo(s: ConciergeService, party: number, hours: number, 
   }
 }
 
+/** How long a service takes, from its versions when they differ: "60 or 90 minutes". */
+export function serviceDuration(s: Pick<ConciergeService, "durationMinutes" | "variants">): string | null {
+  const mins = [...new Set(s.variants.map((v) => v.durationMinutes).filter((m): m is number => !!m))].sort((a, b) => a - b);
+  if (!s.durationMinutes && mins.length > 1) return mins.every((m) => m < 120) ? `${mins.join(" or ")} minutes` : mins.map((m) => durationLine(m)).join(" or ");
+  return durationLine(s.durationMinutes ?? mins[0] ?? null);
+}
+
 export function durationLine(min: number | null): string | null {
   if (!min) return null;
   if (min < 60) return `${min} minutes`;
@@ -517,10 +524,10 @@ export function statusWords(r: Pick<ConciergeRequestView, "status" | "statusLabe
   const api = r.statusLabel?.trim();
   if (api) {
     const m = /^(.+?)\s+[-\u2013\u2014]\s+(.+)$/.exec(api);
-    const rest = m ? m[2] : r.status === "NEW" || r.status === "COMPLETED" ? null : api;
+    const rest = m ? m[2] : null;
     if (rest) line = `${rest.charAt(0).toUpperCase()}${rest.slice(1)}${/[.!?]$/.test(rest) ? "" : "."}`;
   }
-  if (r.status === "AWAITING_GUEST" && r.payment.status === "PENDING") line = "Pay to confirm; the link is below.";
+  if (r.status === "AWAITING_GUEST" && r.payment.status === "PENDING") line = "Pay to confirm it.";
   return { label, tone, line };
 }
 
