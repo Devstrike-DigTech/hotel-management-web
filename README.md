@@ -853,3 +853,29 @@ seeded owner and can be changed with `E2E_STAFF_EMAIL` and `E2E_STAFF_PASSWORD`.
 - Paystack Inline (the popup, using `accessCode`) is not used; the flow redirects to the hosted checkout, which
   is sturdier on low-end phones and in in-app browsers.
 - Amenity filtering is still done in this app, as `GET /public/hotels` does not take amenities.
+
+## Docker and deploy
+
+**Whole stack.** The backend repo runs this app with the API, worker, database and the other two apps:
+`docker compose -f docker-compose.full.yml up --build` in `hotel-management-backend` (see its README, "Run everything
+with Docker"). This repo must sit next to it as `../hotel-management-web`.
+
+**This image alone.** `Dockerfile` builds the Next.js standalone output on `node:22-alpine` and runs `node server.js`
+as the `node` user on port 3000 (`PORT` overrides). `NEXT_PUBLIC_*` are build arguments (inlined into the bundle);
+`API_URL`, `TRUSTED_PROXY_SECRET`, `MARKETPLACE_HOSTS`, `CLIENT_IP_HEADER` are read at run time.
+
+```bash
+docker build -t hotel-web \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
+  --build-arg NEXT_PUBLIC_SITE_URL=https://www.example.com \
+  --build-arg NEXT_PUBLIC_ADMIN_URL=https://app.example.com .
+docker run -p 3000:3000 -e API_URL=http://api:4000 -e TRUSTED_PROXY_SECRET=... hotel-web
+```
+
+Pages pre-rendered at build time (the marketplace home, `/for-hotels`) are built without the API and refresh
+themselves on their revalidate interval once the server runs. Behind a TLS-inspecting proxy, pass its CA as the
+optional build secret `extra_ca` (`--secret id=extra_ca,src=ca.pem`); Google Fonts are fetched during the build.
+
+**Vercel.** `vercel.json` pins pnpm and the function region (`lhr1`, next to the API). Variables for the project,
+wildcard hotel subdomains and custom domains: `docs/deploy.md` in the backend repo. On a `*.vercel.app` address set
+`MARKETPLACE_HOSTS` to that host and `CLIENT_IP_HEADER=x-vercel-forwarded-for`.
