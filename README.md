@@ -139,6 +139,8 @@ Each microsite has its own `robots.txt`, `sitemap.xml` and OpenGraph card in its
 | `/developers/reference`, `/developers/reference/[group]` | M6 API reference, rendered from the partner API's OpenAPI document |
 | `/developers/openapi.json` | The spec the reference was built from, to import into Postman or a generator |
 | `/h/[slug]/trips/[code]`, `/h/[slug]/review` | M6: manage a booking and review a stay on a white-labelled hotel's own domain |
+| `/h/[slug]/concierge`, `/h/[slug]/concierge/[id]` | M8: the concierge's catalogue and one service |
+| `/concierge/q/[token]`, `/h/[slug]/concierge/q/[token]` | M8: a price from the concierge, by its signed link |
 
 ## Design notes: "Laterite and Adire"
 
@@ -211,7 +213,8 @@ src/
     ui/                       wordmark, photo plate, money, amenity icons, theme toggle
     developers/               M6 docs shell, search, code plates and tabs, schema tree, operation, guide frame
     site/                     M6 white-label: brand fonts, footer links, platform credit, the site-links context
-    site-templates/           M7: the six templates, their chrome, shared sections, rates ledger, stay bar, preview banner
+    site-templates/           M7: the six templates, their chrome, shared sections, rates ledger, stay bar, preview banner; M8 concierge section and pages
+    concierge/                M8: request sheet and form, trip requests, quote page, booking step, arrange panel
   lib/
     api.ts, types.ts          typed, server-only client for the public API
     rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
@@ -228,6 +231,7 @@ src/
     theme/                    M7: theme types, template registry, font pairings, the tolerant normaliser, server lookups
     booking-form.ts           M7: the form model, conditions, client checks, answers, issue mapping, pickup times
     pickup.ts                 M7: pickup kinds, transport companies, prices and terms in words
+    concierge.ts              M8: catalogue, requests and quotes as view models, prices and statuses in words, slots
     server/lite.ts            M7: the Essentials home without framework scripts
     developers/               M6: OpenAPI model, example and sample generation, highlighter, guides, search index
     site.ts                   microsite base path and origin
@@ -743,6 +747,99 @@ In development `?template=<id>` tries any layout on any hotel (ignored in produc
 
 Earlier specs fill any required question a seeded form adds and pass the extras step (`fillRequiredAnswers`, `passAddOnsStep`).
 
+## Milestone 8: the concierge ("Arrange something for your stay")
+
+Guests ask the hotel's concierge for lawful services (a massage by a licensed therapist, a private chef, a car with a driver,
+a table at a restaurant, flowers and a cake in the room, a barber, a sitter, laundry) from the hotel's site, while booking and
+from their booking, and can keep a request private. The contract is the backend's `API-M8.md` (sections 4.6, 6.7 to 6.10, 7.4
+and 15). There is no category, copy or example for anything else, and a request the backend's content screen holds for review
+reads exactly like any other received one ("We'll get back to you").
+
+| Editorial: the section | The request sheet, private | The price, by its signed link |
+|---|---|---|
+| ![](docs/screenshots/m8-editorial-section-1440-light.png) | ![](docs/screenshots/m8-sheet-private-1440-light.png) | ![](docs/screenshots/m8-quote-1440-light.png) |
+
+| Heritage catalogue (dark) | Booking: "Anything we can arrange?" | Trip page, live status | Essentials (phone, dark) |
+|---|---|---|---|
+| ![](docs/screenshots/m8-heritage-catalogue-1440-dark.png) | ![](docs/screenshots/m8-book-arrange-1440-light.png) | ![](docs/screenshots/m8-trip-requests-1440-light.png) | ![](docs/screenshots/m8-essentials-section-390-dark.png) |
+
+All M8 screens are in [`docs/screenshots/`](docs/screenshots) as `m8-*.png` at 1440 and 390, light and dark, across Editorial,
+Boutique, Business, Resort, Heritage and Essentials, grain off and quantised to 128 colours.
+
+### On the hotel's site
+
+- **A section in every template** (`src/components/site-templates/concierge.tsx`), in the template's own manner: Editorial a
+  numbered ledger under its categories, Boutique a quiet two-column list with a lot of air, Business a dense price table,
+  Resort rounded cards (a photograph when the service has one, else the kind's mark on a soft field), Heritage a centred tariff
+  with dotted leaders, Essentials a plain list with big tap targets. Only live, approved services the hotel offers
+  (`GET /public/hotels/:slug/concierge`), with "From" for quoted ones and a line on private requests when any service allows
+  them. `concierge` is a new section key: themes published before M8 get it where the template puts it by default (after rooms
+  or dining), and it only shows when the hotel has services.
+- **`/concierge`**: every service by kind, with an index to jump between kinds and "Not on the list?". Server-rendered with no
+  client code: on an Essentials site the proxy serves it without framework scripts, like the home (`x-lite: 1`).
+- **`/concierge/{id}`**: the service (price and versions, how long, where, when it runs and the notice it needs, what happens
+  about payment and privacy) and "Arrange this": a stay this device has opened, or one in the signed-in guest's trips, goes
+  straight to its trip page with the service open (`?arrange=`); otherwise "Book a room and add it" (services offered before
+  arrival) or the confirmation's link.
+- **The marketplace hotel page** shows the same section, linking to the hotel's own concierge pages.
+
+### Asking for something
+
+One sheet (`src/components/concierge/`), from the bottom on a phone and from the side on a computer, opens on the catalogue by
+kind or on one service:
+
+- The service's own questions (the M7 form-field engine, conditions included), its versions (60 or 90 minutes, half or full
+  day), **when**: a day strip over the stay and the API's free slots for services booked by the slot (taken ones struck
+  through), or "Any time" / "Choose a time" for the others, **how many people** where it matters, **hours** for hourly ones,
+  and notes.
+- **Keep this private** for services that allow it and for free-form asks: "Only the concierge team sees this." Switched on,
+  it adds, plainly, that it stays off the front-desk screens, that the hotel contacts the guest only the way they chose and
+  never through the room phone, and that the bill reads "In-room service" or "Guest service".
+- **How should we reach you**: WhatsApp (only when the hotel answers there), text message, email (when the booking has one)
+  or "Here, on this page". The room phone is never offered.
+- **Paying**: auto-priced services show the price before tax; with the stay's bill open the guest chooses "Add to my bill"
+  or "Pay now online", before arrival they pay online to confirm (the practice checkout in development). Quoted ("from")
+  services say an exact price comes first and nothing is charged until it is accepted.
+- **Ask for something else**: in the guest's own words; a person reads it.
+
+### After asking
+
+- **Trip page and confirmation**: "Arranged for your stay", each request with its number, time, party, price, a status chip in
+  calm words (Received, Price ready, Waiting for you, Confirmed, Booked in, Happening now, Done, Not arranged, Cancelled) and
+  the next step: see the price and accept, pay to confirm, cancel, or rate it after completion (stars and a word). Status is
+  polled every 15 seconds while anything is moving and when the tab comes back. Manage links work without an account.
+- **The quote page** (`/concierge/q/{token}`, the API's signed link, also under the hotel's own site): what it is for, the
+  answers, the concierge's note, the amount with each tax line and until when it holds, then "Pay now" or "Add to my bill"
+  (the hotel's own words for it) and "No thanks". Back from Paystack (`?reference=`) it waits for the webhook's answer and
+  shows "Paid and confirmed"; expired, replaced and declined prices each say what to do. On the marketplace host it takes the
+  hotel's colour.
+- **While booking**: an optional step, "Anything we can arrange for your stay?", lists the services offered before arrival.
+  Choices are kept with the booking draft, listed at review as "For the concierge" (not in the room total), and sent the moment
+  the booking exists (`POST /public/trips/:code/concierge/requests`, `source: BOOKING_FLOW`, one idempotency key each), so the
+  confirmation already shows them. "Nothing for now, continue" skips it.
+- **The practice checkout** understands `CRQ_` references and returns to the request.
+
+### Tests (M8)
+
+| Spec | What it proves |
+|---|---|
+| `m8.spec.ts` | From the trip page, a fixed-price service is requested (version, required question, a free slot), paid on the practice checkout and shows Confirmed. A "from" service is quoted through the staff API, the guest opens the price from the trip page, accepts, pays and the quote page shows Paid and confirmed. A service added in the booking step is at review and on the confirmation. A private request shows exactly "Only the concierge team sees this.", the room-phone promise, no room phone among the contact options, and is marked Private. A free-form ask the screen holds reads "Received", "we'll get back to you", with no hint of review. The home section and the full catalogue list every live service; the Essentials catalogue is served lite with no script files |
+
+`passAddOnsStep` also passes the new optional step, so the earlier booking specs keep working when a hotel offers services
+while booking.
+
+## Contract notes (M8)
+
+- The public catalogue, slots, trip concierge, request creation, cancel and rating, the quote page with accept and decline,
+  concierge payments on the practice checkout, `BookingView.concierge` and the guest status labels match `API-M8.md` against the
+  live backend and its seed.
+- `availability.days` counts 0 = Sunday; the web converts to ISO weekdays. `availability: null` means any time.
+- The API's status labels ("Received - we'll get back to you shortly") are split at the dash: the chip keeps a short word, the
+  rest is the line under the request, so a request held by the content screen reads the same as any other.
+- Chips in the sheet use shorter category names ("Dining in", "Occasions", "Tables"); headings use the API's `categoryLabel`.
+- Contact channels are not part of the catalogue: WhatsApp comes from the trip's `contactDefaults.whatsapp`, email only when
+  the booking has one.
+
 ## Testing
 
 ```bash
@@ -763,6 +860,7 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `m5.spec.ts` | M5: the group root and booking each of its hotels, the group host, "Part of" on the marketplace, redeeming points at booking, points earned after check-out, WhatsApp chat only on Pro hotels (see the M5 section) |
 | `developers.spec.ts`, `white-label.spec.ts`, `harmattan.spec.ts` | M6: the docs and reference, white-label on a custom domain, Harmattan on its dedicated database (see the M6 section) |
 | `m7.spec.ts` | M7: the six templates, the Essentials budget, booking through the hotel's form with an extra and a motor-park pickup, email by payment method, draft preview (see the M7 section) |
+| `m8.spec.ts` | M8: the concierge from the trip page (fixed price paid, quoted price accepted and paid), the booking step, private requests, held free-form asks, the catalogue and Essentials lite (see the M8 section) |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the
