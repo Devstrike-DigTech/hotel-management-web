@@ -73,6 +73,8 @@ export function BookingReview({
   onIssues,
   onEdit,
   onDone,
+  arranged,
+  afterBooking,
 }: {
   hotel: BookingHotel;
   site: BookingSite;
@@ -97,6 +99,10 @@ export function BookingReview({
   onQuote: (q: Quote | null) => void;
   onBack: (step: number, message?: string) => void;
   onDone: () => void;
+  /** M8: what the guest asked the concierge for in the step before (priced separately from the room). */
+  arranged?: React.ReactNode;
+  /** M8: runs once the booking exists (before the hold or the confirmation), e.g. to send concierge requests. */
+  afterBooking?: (code: string, manageToken: string) => Promise<void>;
 }) {
   const router = useRouter();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -320,6 +326,7 @@ export function BookingReview({
           callbackUrl: mode === "ONLINE" ? callbackUrl(site, hotel.slug) : undefined,
         },
       });
+      if (afterBooking) await afterBooking(res.booking.code, res.manageToken).catch(() => undefined);
       if (!res.payment) {
         onDone();
         router.push(`${site.confirmPath}?code=${encodeURIComponent(res.booking.code)}&t=${encodeURIComponent(res.manageToken)}&new=1`);
@@ -530,6 +537,7 @@ export function BookingReview({
       </dl>
 
       <ReviewAnswers form={form} answers={answers} cond={cond} quote={quote} onEdit={held ? undefined : onEdit} />
+      {arranged}
 
       {priceNote ? (
         <div className="mt-6">

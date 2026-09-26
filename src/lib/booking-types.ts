@@ -351,6 +351,8 @@ export interface BookingView {
   answers?: import("./booking-form").AnswerView[];
   extras?: (import("./booking-form").QuotedExtra & { status: "ACTIVE" | "CANCELLED" })[];
   transfers?: BookingTransfer[];
+  /* M8 */
+  concierge?: { enabled: boolean; openRequests: number; offerAfterBooking: boolean } | null;
 }
 
 export interface BookingCreated {

@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { API, fillRequiredAnswers, futureStay, newGuest, randomIp, staffToken } from "./helpers";
+import { API, fillRequiredAnswers, futureStay, newGuest, passAddOnsStep, passArrangeStep, randomIp, staffToken } from "./helpers";
 
 /**
  * M7 on the guest side: the six booking-site templates over the seeded hotels, the Essentials
@@ -186,6 +186,7 @@ test("book through the hotel's own form: a conditional question, an extra and a 
   await page.getByTestId("pickup-ticket").fill("GIG-44821");
   await expect(page.getByTestId("pickup-price")).toContainText("₦");
   await page.getByTestId("booking-next").click();
+  await passArrangeStep(page);
 
   // Review: the answers, the pickup and the extra, priced by the quote.
   await expect(page.getByTestId("quote-total")).toBeVisible();
@@ -216,9 +217,7 @@ test("email is optional to pay at the hotel but needed to pay online", async ({ 
   await expect(page.getByTestId("guest-email")).not.toHaveAttribute("aria-required", "true");
   await fillRequiredAnswers(page);
   await page.getByTestId("booking-next").click();
-  const addons = page.getByTestId("step-addons");
-  await expect(addons.or(page.getByTestId("quote-total")).first()).toBeVisible();
-  if (await addons.isVisible()) await page.getByTestId("booking-next").click();
+  await passAddOnsStep(page);
   await expect(page.getByTestId("quote-total")).toBeVisible();
 
   // Online without an email: asked for it at once, and nothing is held.

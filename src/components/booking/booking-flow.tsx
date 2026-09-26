@@ -58,6 +58,9 @@ import {
 import { ExtrasPicker } from "./extras-picker";
 import { FormFieldInput } from "./form-fields";
 import { checkPickup, PickupBlock, type PickupContext } from "./pickup-block";
+import type { ConciergeCatalogue } from "@/lib/concierge";
+import { ArrangedSummary, ArrangeStep, sendDrafts } from "../concierge/arrange-step";
+import type { DraftRequest } from "../concierge/request-form";
 
 export interface BookingHotel {
   slug: string;
@@ -99,8 +102,8 @@ export interface GuestForm {
   email: string;
 }
 
-type StepKey = "stay" | "details" | "addons" | "review";
-const STEP_LABEL: Record<StepKey, string> = { stay: "Your stay", details: "Your details", addons: "Extras and getting here", review: "Review and pay" };
+type StepKey = "stay" | "details" | "addons" | "arrange" | "review";
+const STEP_LABEL: Record<StepKey, string> = { stay: "Your stay", details: "Your details", addons: "Extras and getting here", arrange: "For your stay", review: "Review and pay" };
 const WORDS = ["one", "two", "three", "four", "five"];
 
 interface Draft {
@@ -108,6 +111,8 @@ interface Draft {
   guest: GuestForm;
   answers: Answers;
   extras: ExtraSelection[];
+  /** M8: requests for the concierge, sent once the booking exists. */
+  arranged?: DraftRequest[];
   held: (Held & { roomId: string; planId?: string; kind: StayKind; range: Range; dayUse: DayUse; adults: number; children: number }) | null;
 }
 
@@ -121,11 +126,14 @@ export function BookingFlow({
   initial,
   form,
   preview = null,
+  concierge = null,
 }: {
   hotel: BookingHotel;
   site: BookingSite;
   today: ISODate;
-  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
+  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number; arrange?: string | null };
+  /** M8: the concierge services the hotel offers while booking (channel BOOKING_FLOW), or null. */
+  concierge?: ConciergeCatalogue | null;
   /** M7: the hotel's published booking form for this channel (or the draft in preview). */
   form: PublicBookingForm;
   /** M7: the preview token when the admin is previewing a draft form (booking is switched off). */
@@ -137,7 +145,9 @@ export function BookingFlow({
   // M7: the form decides whether extras and the pickup get a step of their own.
   const guestFields = useMemo(() => answerFields(form), [form]);
   const hasAddOns = guestFields.some((f) => isAddOnField(f));
-  const steps: StepKey[] = hasAddOns ? ["stay", "details", "addons", "review"] : ["stay", "details", "review"];
+  // M8: "Anything we can arrange for your stay?" when the hotel offers services before arrival.
+  const hasArrange = !!concierge?.services.some((s) => s.preArrival);
+  const steps: StepKey[] = ["stay", "details", ...(hasAddOns ? (["addons"] as const) : []), ...(hasArrange ? (["arrange"] as const) : []), "review"];
   const stepKey: StepKey = step < 0 ? "review" : steps[Math.min(step, steps.length - 1)];
   const reviewIndex = steps.length - 1;
   const [roomId, setRoomId] = useState<string | undefined>(rooms.some((r) => r.id === initial.room) ? initial.room! : undefined);
@@ -150,6 +160,7 @@ export function BookingFlow({
   const [guest, setGuest] = useState<GuestForm>({ fullName: "", phone: "", email: "" });
   const [answers, setAnswers] = useState<Answers>({});
   const [extras, setExtras] = useState<ExtraSelection[]>([]);
+  const [arranged, setArranged] = useState<DraftRequest[]>([]);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [errors, setErrors] = useState<Partial<Record<keyof GuestForm | "dates" | "room" | "plan", string>>>({});
   const [held, setHeld] = useState<Held | null>(null);
@@ -192,6 +203,7 @@ export function BookingFlow({
       setGuest((g) => ({ ...g, ...d.guest }));
       setAnswers((a) => ({ ...d.answers, ...a }));
       setExtras((x) => (x.length ? x : (d.extras ?? [])));
+      setArranged((x) => (x.length ? x : (d.arranged ?? [])));
       if (d.held && new Date(d.held.holdExpiresAt).getTime() > Date.now()) {
         setRoomId(d.held.roomId);
         if (d.held.planId) setPlanPick(d.held.planId);
@@ -213,9 +225,10 @@ export function BookingFlow({
       guest,
       answers,
       extras,
+      arranged,
       held: held && roomId ? { ...held, roomId, planId: plan?.id, kind: effectiveKind, range, dayUse, adults, children } : null,
     } satisfies Draft);
-  }, [draftKey, guest, answers, extras, held, roomId, plan?.id, effectiveKind, range, dayUse, adults, children]);
+  }, [draftKey, guest, answers, extras, arranged, held, roomId, plan?.id, effectiveKind, range, dayUse, adults, children]);
 
   /* A signed-in guest: fetch the account and fill in what we know. */
   useEffect(() => {
@@ -404,7 +417,7 @@ export function BookingFlow({
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_24rem] lg:gap-14">
       <div className="min-w-0">
-        <Stepper labels={steps.map((k) => STEP_LABEL[k])} step={steps.indexOf(stepKey)} locked={!!held} onStep={(i) => i < steps.indexOf(stepKey) && !held && setStep(i)} />
+        <Stepper labels={steps.map((k) => (k === "addons" && steps.length > 4 ? "Extras" : STEP_LABEL[k]))} step={steps.indexOf(stepKey)} locked={!!held} onStep={(i) => i < steps.indexOf(stepKey) && !held && setStep(i)} />
         {preview ? (
           <div className="mt-6">
             <Notice tone="info" title="Draft preview of the booking form">
@@ -563,6 +576,28 @@ export function BookingFlow({
               </div>
             </div>
           ) : null}
+          {stepKey === "arrange" && concierge ? (
+            <ArrangeStep
+              catalogue={concierge}
+              drafts={arranged}
+              setDrafts={setArranged}
+              initialOpen={initial.arrange ?? null}
+              ctx={{
+                kind: "draft",
+                arrivalDate: effectiveKind === "dayuse" ? dayUse.date : (range.checkIn ?? today),
+                departureDate: effectiveKind === "dayuse" ? dayUse.date : (range.checkOut ?? range.checkIn ?? today),
+                party: adults + children,
+                hotelSlug: hotel.slug,
+                today,
+                hasEmail: !!guest.email.trim(),
+              }}
+              title={
+                <StepTitle n={steps.indexOf("arrange")} total={steps.length}>
+                  Anything we can <em className="accent">arrange</em> for your stay?
+                </StepTitle>
+              }
+            />
+          ) : null}
           {stepKey === "review" && quoteRequest ? (
             <BookingReview
               hotel={hotel}
@@ -594,7 +629,16 @@ export function BookingFlow({
                 setStep(to === 0 ? 0 : steps.indexOf("details"));
               }}
               onEdit={(k) => setStep(steps.indexOf(k))}
-              onDone={() => draft.set(draftKey, { v: 3, guest, answers: {}, extras: [], held: null } satisfies Draft)}
+              onDone={() => draft.set(draftKey, { v: 3, guest, answers: {}, extras: [], arranged: [], held: null } satisfies Draft)}
+              arranged={<ArrangedSummary drafts={arranged} onEdit={held ? undefined : () => setStep(steps.indexOf("arrange"))} />}
+              afterBooking={
+                arranged.length && !preview
+                  ? async (code, token) => {
+                      const failed = await sendDrafts(code, token, arranged);
+                      if (failed) draft.set(`concierge:failed:${code}`, failed);
+                    }
+                  : undefined
+              }
             />
           ) : null}
 
@@ -610,7 +654,7 @@ export function BookingFlow({
                 </Link>
               )}
               <button type="button" className="btn btn-primary group" onClick={next} disabled={onlineOff} data-testid="booking-next">
-                Continue to {STEP_LABEL[steps[steps.indexOf(stepKey) + 1]].toLowerCase()}
+                {stepKey === "arrange" && !arranged.length ? "Nothing for now, continue" : `Continue to ${STEP_LABEL[steps[steps.indexOf(stepKey) + 1]].toLowerCase()}`}
                 <ArrowRight size={16} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
@@ -648,7 +692,7 @@ const NUMERALS = ["i", "ii", "iii", "iv", "v"];
 function Stepper({ labels, step, onStep, locked }: { labels: string[]; step: number; onStep: (i: number) => void; locked: boolean }) {
   return (
     <>
-    <ol className={`grid border-b border-line ${labels.length === 4 ? "grid-cols-4" : "grid-cols-3"}`} aria-label="Booking steps">
+    <ol className={`grid border-b border-line ${labels.length === 5 ? "grid-cols-5" : labels.length === 4 ? "grid-cols-4" : "grid-cols-3"}`} aria-label="Booking steps">
       {labels.map((label, i) => {
         const done = i < step;
         const current = i === step;

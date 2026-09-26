@@ -22,7 +22,7 @@ export async function BookingPage({
 }: {
   hotel: HotelDetail;
   today: ISODate;
-  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number };
+  initial: { room: string | null; plan?: string | null; checkIn: ISODate | null; checkOut: ISODate | null; guests: number; arrange?: string | null };
   hotelHref: string;
   channel: BookingChannel;
   confirmPath: string;
@@ -34,6 +34,8 @@ export async function BookingPage({
   // M7: the hotel's own booking form for this channel; the built-in one against an older API.
   const raw = await api.bookingForm(hotel.slug, formChannel ?? channel, preview).catch(() => null);
   const form = raw ? normaliseForm(raw, formChannel ?? channel) : builtInForm(channel);
+  // M8: services the concierge takes while booking (null without the concierge).
+  const concierge = await api.concierge(hotel.slug, "BOOKING_FLOW").catch(() => null);
   return (
     <div className="container-page pb-8 pt-8 lg:pt-10">
       <Link href={hotelHref} className="kicker inline-flex items-center gap-2 hover:text-ink">
@@ -64,6 +66,7 @@ export async function BookingPage({
           initial={initial}
           form={form}
           preview={preview && form.preview ? preview : null}
+          concierge={concierge}
         />
       </div>
     </div>

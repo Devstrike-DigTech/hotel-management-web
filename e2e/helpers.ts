@@ -127,12 +127,22 @@ export async function fillRequiredAnswers(page: Page) {
 /** Continues past the extras and getting-here step when the form has one. */
 export async function passAddOnsStep(page: Page) {
   const addons = page.getByTestId("step-addons");
+  const arrange = page.getByTestId("step-arrange");
   const quote = page.getByTestId("quote-total");
-  await expect(addons.or(quote).first()).toBeVisible();
+  await expect(addons.or(arrange).or(quote).first()).toBeVisible();
   if (await addons.isVisible()) {
     await fillRequiredAnswers(page);
     await page.getByTestId("booking-next").click();
   }
+  await passArrangeStep(page);
+}
+
+/** M8: the optional "Anything we can arrange for your stay?" step, passed with nothing added. */
+export async function passArrangeStep(page: Page) {
+  const arrange = page.getByTestId("step-arrange");
+  const quote = page.getByTestId("quote-total");
+  await expect(arrange.or(quote).first()).toBeVisible();
+  if (await arrange.isVisible()) await page.getByTestId("booking-next").click();
 }
 
 /** Newest dev-outbox message to a recipient (the backend's non-production mail/SMS capture). */

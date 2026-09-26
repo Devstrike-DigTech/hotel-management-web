@@ -30,9 +30,13 @@ import { WhatsAppChat } from "../chat/whatsapp-chat";
 import { useHotelChat } from "../chat/use-hotel-chat";
 import { PointsToEarn } from "../loyalty/redeem-points";
 import { JoinProgramme } from "../loyalty/join-programme";
+import { TripConcierge } from "../concierge/trip-concierge";
 
 export function TripDetail({ code, appName }: { code: string; appName: string | null }) {
-  const token = useSearchParams().get("t");
+  const params = useSearchParams();
+  const token = params.get("t");
+  // M8: "Arrange this" on a hotel's service page lands here with ?arrange=<service id>.
+  const arrange = params.get("arrange");
   const site = useSiteLinks();
   // Guest accounts live on the marketplace; a white-labelled hotel's own domain only has link access.
   const hint = useGuestHint();
@@ -131,6 +135,7 @@ export function TripDetail({ code, appName }: { code: string; appName: string | 
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_22rem] lg:gap-12">
         <div className="min-w-0">
           <ConfirmationCard data={toConfirmation(b, null)} appName={appName} />
+          <TripConcierge booking={b} token={token!} base={site.base} arrange={arrange} />
         </div>
 
         <aside className="space-y-5" aria-label="Manage this booking">

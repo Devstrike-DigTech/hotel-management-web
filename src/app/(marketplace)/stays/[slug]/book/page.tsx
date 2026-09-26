@@ -31,7 +31,7 @@ export default async function BookPage({ params, searchParams }: PageProps<"/sta
       hotelHref={`/stays/${hotel.slug}`}
       channel="MARKETPLACE"
       confirmPath="/booking/confirmation"
-      initial={{ room: one(sp.room) || null, plan: one(sp.plan) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12) }}
+      initial={{ room: one(sp.room) || null, plan: one(sp.plan) || null, ...stay, guests: Math.min(Math.max(Number(one(sp.guests)) || 2, 1), 12), arrange: one(sp.arrange) || null }}
     />
   );
 }

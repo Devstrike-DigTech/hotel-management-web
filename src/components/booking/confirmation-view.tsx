@@ -11,6 +11,7 @@ import { formatFullDay } from "@/lib/dates";
 import { formatNaira } from "@/lib/format";
 import { formatPoints } from "@/lib/loyalty";
 import { WhatsAppChat } from "../chat/whatsapp-chat";
+import { TripConcierge } from "../concierge/trip-concierge";
 import { useHotelChat } from "../chat/use-hotel-chat";
 import { PointsToEarn } from "../loyalty/redeem-points";
 import { formatLagosDateTime, formatLagosShort, policyTail } from "@/lib/time";
@@ -352,6 +353,12 @@ export function ConfirmationView({
       ) : null}
 
       <ConfirmationCard data={data} appName={appName} />
+
+      {!cancelled ? (
+        <div className="mx-auto max-w-[46rem]">
+          <TripConcierge booking={b} token={view.manageToken} base={site.base} />
+        </div>
+      ) : null}
 
       {!cancelled && (chat || (b.loyalty && b.loyalty.pointsToEarn > 0)) ? (
         <div className="mx-auto mt-8 grid max-w-[46rem] gap-4 sm:grid-cols-2">

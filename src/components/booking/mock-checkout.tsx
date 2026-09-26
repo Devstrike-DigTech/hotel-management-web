@@ -15,9 +15,22 @@ const METHODS: [Method, string, typeof CreditCard][] = [
   ["ussd", "USSD", DeviceMobile],
 ];
 
-/** Where to send the guest after the practice payment: the booking's callback, with Paystack's query. */
-function back(status: PaymentStatusView) {
-  const u = new URL(status.callbackUrl, window.location.origin);
+/** M8: a concierge payment (`CRQ_` reference) answers this shape instead of a booking's. */
+interface ConciergePaymentStatus {
+  kind: "CONCIERGE";
+  reference: string;
+  state: "PENDING" | "SUCCESS" | "FAILED";
+  message: string;
+  amountKobo: number;
+  requestNumber: string;
+  returnUrl: string;
+}
+type AnyStatus = PaymentStatusView | ConciergePaymentStatus;
+const isConcierge = (s: AnyStatus | null): s is ConciergePaymentStatus => !!s && (s as ConciergePaymentStatus).kind === "CONCIERGE";
+
+/** Where to send the guest after the practice payment: the booking's callback (or the concierge page), with Paystack's query. */
+function back(status: AnyStatus) {
+  const u = new URL(isConcierge(status) ? status.returnUrl : status.callbackUrl, window.location.origin);
   u.searchParams.set("reference", status.reference);
   u.searchParams.set("trxref", status.reference);
   return u.toString();
@@ -25,14 +38,14 @@ function back(status: PaymentStatusView) {
 
 export function MockCheckout() {
   const reference = useSearchParams().get("reference");
-  const [status, setStatus] = useState<PaymentStatusView | null>(null);
+  const [status, setStatus] = useState<AnyStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [method, setMethod] = useState<Method>("card");
   const [busy, setBusy] = useState<null | "success" | "failed">(null);
 
   useEffect(() => {
     if (!reference) return;
-    call<PaymentStatusView>(`public/payments/${encodeURIComponent(reference)}/verify`)
+    call<AnyStatus>(`public/payments/${encodeURIComponent(reference)}/verify`)
       .then(setStatus)
       .catch((e) => setError(humanError(e, "This payment reference was not found.")));
   }, [reference]);
@@ -41,7 +54,7 @@ export function MockCheckout() {
     if (!reference || !status) return;
     setBusy(outcome);
     try {
-      const s = await call<PaymentStatusView>(`public/dev/payments/${encodeURIComponent(reference)}/confirm`, {
+      const s = await call<AnyStatus>(`public/dev/payments/${encodeURIComponent(reference)}/confirm`, {
         method: "POST",
         body: { outcome, channel: method },
         timeoutMs: 30_000,
@@ -53,7 +66,8 @@ export function MockCheckout() {
     }
   }
 
-  const b = status?.booking;
+  const b = status && !isConcierge(status) ? status.booking : null;
+  const concierge = isConcierge(status) ? status : null;
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
       <p className="kicker mb-4 inline-flex items-center gap-2 self-center rounded-xs border border-ochre/50 px-2 py-1 !text-ochre">
@@ -63,7 +77,8 @@ export function MockCheckout() {
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
           <div className="min-w-0">
             <p className="kicker">Paying</p>
-            <p className="display-sm mt-1 truncate text-xl">{b?.hotel.name ?? "Loading"}</p>
+            <p className="display-sm mt-1 truncate text-xl">{concierge ? "Concierge request" : (b?.hotel.name ?? "Loading")}</p>
+            {concierge ? <p className="num mt-0.5 text-sm text-ink-muted">{concierge.requestNumber}</p> : null}
             {b ? (
               <p className="mt-0.5 text-sm text-ink-muted">
                 {b.roomType.name}, {formatShort(b.arrivalDate)} to {formatShort(b.departureDate)}
@@ -88,7 +103,7 @@ export function MockCheckout() {
           <div className="px-6 py-6 text-sm">
             <p>This payment is already {status.state.toLowerCase()}.</p>
             <a href={back(status)} className="btn btn-outline mt-4 w-full">
-              Return to the booking
+              {concierge ? "Return to the request" : "Return to the booking"}
             </a>
           </div>
         ) : (
