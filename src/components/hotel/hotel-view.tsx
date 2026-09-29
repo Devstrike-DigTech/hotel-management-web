@@ -150,7 +150,7 @@ export function HotelView({ hotel, reviews, today, initial, bookBase, variant, c
             <section id="rooms" aria-labelledby="rooms-title" className="mt-14 scroll-mt-28">
               <SectionHead n={3} id="rooms-title" title="Rooms" aside={`${hotel.roomTypes.length} ${hotel.roomTypes.length === 1 ? "type" : "types"}`} />
               <div className="mt-6">
-                <RoomList rooms={hotel.roomTypes} />
+                <RoomList rooms={hotel.roomTypes} roomsBase={variant === "marketplace" ? `/stays/${hotel.slug}/rooms` : `${bookBase.replace(/\/book$/, "")}/rooms`} />
               </div>
             </section>
 

@@ -61,7 +61,7 @@ export async function BookingPage({
             booking: hotel.booking ?? null,
             groupName: hotel.group?.name ?? null,
           }}
-          site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: hidesPlatform(hotel.whiteLabel) ? null : APP_NAME }}
+          site={{ channel, confirmPath, hotelHref, devMode: process.env.NODE_ENV !== "production", appName: hidesPlatform(hotel.whiteLabel) ? null : APP_NAME, roomsBase: `${hotelHref.replace(/\/$/, "")}/rooms` }}
           today={today}
           initial={initial}
           form={form}

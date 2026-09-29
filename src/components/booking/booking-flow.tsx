@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   Bed,
   CalendarBlank,
   Check,
@@ -37,6 +38,7 @@ import { PlanChoice } from "./rate-plans";
 import { useAvailability, type AvailabilityQuery } from "./use-availability";
 import { usePriceCalendar } from "./use-price-calendar";
 import { plansFor, planTitle, type PlanOffer } from "@/lib/rates";
+import { roomHref } from "@/lib/rooms";
 import {
   answerFields,
   checkField,
@@ -88,6 +90,8 @@ export interface BookingSite {
   devMode: boolean;
   /** The platform's name, or null on a white-labelled hotel's own domain. */
   appName: string | null;
+  /** Where each room type's own page lives ("View details" in step one). */
+  roomsBase?: string;
 }
 
 export type StayKind = "overnight" | "dayuse";
@@ -150,7 +154,8 @@ export function BookingFlow({
   const steps: StepKey[] = ["stay", "details", ...(hasAddOns ? (["addons"] as const) : []), ...(hasArrange ? (["arrange"] as const) : []), "review"];
   const stepKey: StepKey = step < 0 ? "review" : steps[Math.min(step, steps.length - 1)];
   const reviewIndex = steps.length - 1;
-  const [roomId, setRoomId] = useState<string | undefined>(rooms.some((r) => r.id === initial.room) ? initial.room! : undefined);
+  // The room comes by id from the hotel page, or by its slug from a room's own page or an old link.
+  const [roomId, setRoomId] = useState<string | undefined>(rooms.find((r) => r.id === initial.room || (!!r.slug && r.slug === initial.room))?.id);
   const [kind, setKind] = useState<StayKind>("overnight");
   const [planPick, setPlanPick] = useState<string | undefined>(initial.plan ?? undefined);
   const [range, setRange] = useState<Range>({ checkIn: initial.checkIn, checkOut: initial.checkOut });
@@ -455,6 +460,7 @@ export function BookingFlow({
           ) : null}
           {stepKey === "stay" ? (
             <StepStay
+              roomsBase={site.roomsBase}
               total={steps.length}
               rooms={rooms}
               roomId={roomId}
@@ -734,6 +740,7 @@ export function StepTitle({ n, total = 3, children }: { n: number; total?: numbe
 /* ------------------------------------------------------------------ Step 1: the stay */
 
 function StepStay(props: {
+  roomsBase?: string;
   total: number;
   rooms: RoomTypePublic[];
   roomId?: string;
@@ -875,72 +882,84 @@ function StepStay(props: {
             const quoted = rPlans.filter((p) => p.bookable && p.quote).map((p) => p.quote!.totalKobo);
             const cheapest = quoted.length ? Math.min(...quoted) : (lr?.quote?.totalKobo ?? null);
             const several = rPlans.length > 1;
+            const details = props.roomsBase ? roomHref(props.roomsBase, r, { checkIn: range.checkIn, checkOut: range.checkOut, guests: props.adults }) : null;
             return (
-              <label
-                key={r.id}
-                className={`relative grid cursor-pointer grid-cols-[4.5rem_1fr_auto] items-center gap-4 rounded-sm border p-3 pr-4 transition-colors sm:grid-cols-[6rem_1fr_auto] ${
-                  on ? "border-laterite bg-laterite/[0.05]" : "border-line-strong hover:border-ink-muted"
-                } ${out ? "cursor-not-allowed opacity-55" : ""}`}
-                data-testid="room-option"
-              >
-                <input type="radio" name="room" value={r.id} checked={on} disabled={out} onChange={() => setRoomId(r.id)} className="peer sr-only" />
-                <Plate src={r.images[0]?.url} alt={r.images[0]?.alt ?? r.name} sizes="96px" caption={false} className="aspect-[4/3] rounded-xs" />
-                <span className="min-w-0">
-                  <span className="display-sm block text-lg">{r.name}</span>
-                  <span className="num mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-ink-muted">
-                    <span className={`inline-flex items-center gap-1 ${tooSmall ? "text-ochre" : ""}`}>
-                      <UsersThree size={13} aria-hidden /> Sleeps {r.capacity}
-                    </span>
-                    {r.bedType ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Bed size={13} aria-hidden /> {r.bedType}
+              <div key={r.id} className="relative">
+                <label
+                  className={`relative grid cursor-pointer grid-cols-[4.5rem_1fr_auto] items-center gap-4 rounded-sm border p-3 pr-4 transition-colors sm:grid-cols-[6rem_1fr_auto] ${details ? "pb-11" : ""} ${
+                    on ? "border-laterite bg-laterite/[0.05]" : "border-line-strong hover:border-ink-muted"
+                  } ${out ? "cursor-not-allowed opacity-55" : ""}`}
+                  data-testid="room-option"
+                >
+                  <input type="radio" name="room" value={r.id} checked={on} disabled={out} onChange={() => setRoomId(r.id)} className="peer sr-only" />
+                  <Plate src={r.images[0]?.url} alt={r.images[0]?.alt ?? r.name} sizes="96px" caption={false} className="aspect-[4/3] rounded-xs" />
+                  <span className="min-w-0">
+                    <span className="display-sm block text-lg">{r.name}</span>
+                    <span className="num mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-ink-muted">
+                      <span className={`inline-flex items-center gap-1 ${tooSmall ? "text-ochre" : ""}`}>
+                        <UsersThree size={13} aria-hidden /> Sleeps {r.capacity}
                       </span>
-                    ) : null}
-                    {r.sizeSqm ? (
-                      <span className="hidden items-center gap-1 sm:inline-flex">
-                        <Ruler size={13} aria-hidden /> {r.sizeSqm} m&sup2;
+                      {r.bedType ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Bed size={13} aria-hidden /> {r.bedType}
+                        </span>
+                      ) : null}
+                      {r.sizeSqm ? (
+                        <span className="hidden items-center gap-1 sm:inline-flex">
+                          <Ruler size={13} aria-hidden /> {r.sizeSqm} m&sup2;
+                        </span>
+                      ) : null}
+                    </span>
+                    {lr ? (
+                      <span className={`kicker mt-1.5 block !text-[10px] ${out ? "" : lr.lowAvailability ? "!text-laterite" : "!text-palm"}`}>
+                        {out
+                          ? lr.unavailableReason === "CAPACITY"
+                            ? "Too small for your group"
+                            : lr.unavailableReason === "NO_HOURLY_RATE"
+                              ? "No day use for this room"
+                              : "Full on your dates"
+                          : lr.lowAvailability
+                            ? `Only ${lr.available} left`
+                            : "Free for your dates"}
                       </span>
                     ) : null}
                   </span>
-                  {lr ? (
-                    <span className={`kicker mt-1.5 block !text-[10px] ${out ? "" : lr.lowAvailability ? "!text-laterite" : "!text-palm"}`}>
-                      {out
-                        ? lr.unavailableReason === "CAPACITY"
-                          ? "Too small for your group"
-                          : lr.unavailableReason === "NO_HOURLY_RATE"
-                            ? "No day use for this room"
-                            : "Full on your dates"
-                        : lr.lowAvailability
-                          ? `Only ${lr.available} left`
-                          : "Free for your dates"}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-right">
-                  {lr?.quote && lr.bookable ? (
-                    <>
-                      {several ? <span className="block text-[11px] text-ink-muted">from</span> : null}
-                      <span className="num block font-medium">{formatNaira(cheapest)}</span>
-                      <span className="text-xs text-ink-muted">{kind === "dayuse" ? `${lr.quote.units} hours` : `${lr.quote.units} ${lr.quote.units === 1 ? "night" : "nights"}`}, all in</span>
-                    </>
-                  ) : (
-                    <>
-                      {kind === "overnight" && (several || r.fromKobo) ? <span className="block text-[11px] text-ink-muted">from</span> : null}
-                      <span className="num block font-medium">
-                        {formatNaira(kind === "dayuse" && r.hourlyPriceKobo ? r.hourlyPriceKobo : fromNightly(r, rPlans))}
-                      </span>
-                      <span className="text-xs text-ink-muted">{kind === "dayuse" ? "an hour" : "a night"}</span>
-                    </>
-                  )}
-                </span>
-                <span
-                  aria-hidden
-                  className={`absolute -left-px -top-px grid size-5 place-items-center rounded-br-sm rounded-tl-sm transition-opacity ${on ? "bg-laterite text-laterite-ink opacity-100" : "opacity-0"}`}
-                >
-                  <Check size={12} weight="bold" />
-                </span>
-                <span aria-hidden className="pointer-events-none absolute inset-0 rounded-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-laterite" />
-              </label>
+                  <span className="text-right">
+                    {lr?.quote && lr.bookable ? (
+                      <>
+                        {several ? <span className="block text-[11px] text-ink-muted">from</span> : null}
+                        <span className="num block font-medium">{formatNaira(cheapest)}</span>
+                        <span className="text-xs text-ink-muted">{kind === "dayuse" ? `${lr.quote.units} hours` : `${lr.quote.units} ${lr.quote.units === 1 ? "night" : "nights"}`}, all in</span>
+                      </>
+                    ) : (
+                      <>
+                        {kind === "overnight" && (several || r.fromKobo) ? <span className="block text-[11px] text-ink-muted">from</span> : null}
+                        <span className="num block font-medium">
+                          {formatNaira(kind === "dayuse" && r.hourlyPriceKobo ? r.hourlyPriceKobo : fromNightly(r, rPlans))}
+                        </span>
+                        <span className="text-xs text-ink-muted">{kind === "dayuse" ? "an hour" : "a night"}</span>
+                      </>
+                    )}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={`absolute -left-px -top-px grid size-5 place-items-center rounded-br-sm rounded-tl-sm transition-opacity ${on ? "bg-laterite text-laterite-ink opacity-100" : "opacity-0"}`}
+                  >
+                    <Check size={12} weight="bold" />
+                  </span>
+                  <span aria-hidden className="pointer-events-none absolute inset-0 rounded-sm peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-laterite" />
+                </label>
+                {details ? (
+                  <Link
+                    href={details}
+                    className="absolute bottom-2.5 left-[6.25rem] inline-flex items-center gap-1 text-[12.5px] font-medium text-laterite underline-offset-4 hover:underline sm:left-[7.75rem]"
+                    aria-label={`View details of the ${r.name}: photographs, what is in the room and every rate`}
+                    data-testid="view-details"
+                  >
+                    View details <ArrowUpRight size={12} aria-hidden />
+                  </Link>
+                ) : null}
+              </div>
             );
           })}
         </div>

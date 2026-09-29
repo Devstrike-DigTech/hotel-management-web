@@ -1,32 +1,37 @@
-import { Bed, Ruler, UsersThree } from "@phosphor-icons/react/ssr";
+import { ArrowUpRight, Bed, Images, Ruler, UsersThree } from "@phosphor-icons/react/ssr";
+import { coverOf, photoCount } from "@/lib/rooms";
 import type { RoomTypePublic } from "@/lib/types";
 import { AmenityIcon } from "../ui/amenity";
 import { Plate } from "../ui/plate";
-import { RoomOffer, RoomPlans } from "./stay-context";
+import { RoomDetailsLink, RoomOffer, RoomPlans } from "./stay-context";
 
-export function RoomList({ rooms }: { rooms: RoomTypePublic[] }) {
+/** `roomsBase`: where each room's own page lives ("/stays/{slug}/rooms" or the microsite's "{base}/rooms"). */
+export function RoomList({ rooms, roomsBase }: { rooms: RoomTypePublic[]; roomsBase: string }) {
   if (!rooms.length)
     return <p className="border-y border-line py-10 text-ink-muted">This hotel has not published its rooms yet. Call the front desk for rates.</p>;
   const sorted = [...rooms].sort((a, b) => a.basePriceKobo - b.basePriceKobo);
   return (
     <ol className="divide-y divide-line border-y border-line">
       {sorted.map((r, i) => (
-        <RoomRow key={r.id} room={r} n={i + 1} />
+        <RoomRow key={r.id} room={r} n={i + 1} roomsBase={roomsBase} />
       ))}
     </ol>
   );
 }
 
-function RoomRow({ room, n }: { room: RoomTypePublic; n: number }) {
+function RoomRow({ room, n, roomsBase }: { room: RoomTypePublic; n: number; roomsBase: string }) {
+  const cover = coverOf(room);
+  const photos = photoCount(room);
   return (
-    <li className="grid gap-5 py-7 sm:grid-cols-[11rem_1fr] lg:grid-cols-[12rem_1fr_auto] lg:gap-7">
-      <Plate
-        src={room.images[0]?.url}
-        alt={room.images[0]?.alt ?? room.name}
-        label={room.name}
-        sizes="(min-width: 640px) 12rem, 100vw"
-        className="aspect-[4/3] rounded-sm"
-      />
+    <li className="grid gap-5 py-7 sm:grid-cols-[11rem_1fr] lg:grid-cols-[12rem_1fr_auto] lg:gap-7" data-testid="room-card">
+      <RoomDetailsLink roomsBase={roomsBase} room={room} className="group relative block self-start" tabIndex={-1} label={`Photographs and details of the ${room.name}`}>
+        <Plate src={cover?.url} alt={cover?.alt ?? room.name} label={room.name} sizes="(min-width: 640px) 12rem, 100vw" className="aspect-[4/3] rounded-sm" imgClassName="group-hover:scale-[1.03]" />
+        {photos > 1 ? (
+          <span aria-hidden className="num absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-xs bg-paper/90 px-1.5 py-0.5 text-[10.5px] text-ink">
+            <Images size={12} /> {photos}
+          </span>
+        ) : null}
+      </RoomDetailsLink>
       <div className="min-w-0">
         <p className="kicker">
           <span className="text-laterite">Room type {String(n).padStart(2, "0")}</span>
@@ -57,6 +62,9 @@ function RoomRow({ room, n }: { room: RoomTypePublic; n: number }) {
             ))}
           </ul>
         ) : null}
+        <RoomDetailsLink roomsBase={roomsBase} room={room} className="link-static mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-laterite">
+          View details{photos > 1 ? <span className="font-normal text-ink-muted">, {photos} photos</span> : null} <ArrowUpRight size={14} aria-hidden />
+        </RoomDetailsLink>
       </div>
       <div className="flex flex-col gap-4 border-t border-line pt-4 sm:col-span-2 sm:flex-row sm:items-end sm:justify-between lg:col-span-1 lg:w-52 lg:flex-col lg:items-end lg:justify-between lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
         <RoomOffer room={room} />

@@ -2,8 +2,9 @@ import { ArrowDown } from "@phosphor-icons/react/ssr";
 import { formatClock } from "@/lib/format";
 import type { ThemeSection } from "@/lib/theme/types";
 import type { RoomTypePublic } from "@/lib/types";
+import { coverOf, photoCount } from "@/lib/rooms";
 import { Plate } from "../ui/plate";
-import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
+import { MobileBookBar, RoomDetailsLink, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
 import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
@@ -138,7 +139,7 @@ function BoutiqueSection({ ctx, section, index }: { ctx: SiteCtx; section: Theme
             {[...hotel.roomTypes]
               .sort((a, b) => a.basePriceKobo - b.basePriceKobo)
               .map((r, i) => (
-                <BoutiqueRoom key={r.id} room={r} flip={i % 2 === 1} />
+                <BoutiqueRoom key={r.id} room={r} flip={i % 2 === 1} roomsBase={`${ctx.base}/rooms`} />
               ))}
           </ol>
         </div>,
@@ -314,17 +315,15 @@ function BoutiqueSection({ ctx, section, index }: { ctx: SiteCtx; section: Theme
   }
 }
 
-function BoutiqueRoom({ room, flip }: { room: RoomTypePublic; flip: boolean }) {
-  const img = room.images[0];
+function BoutiqueRoom({ room, flip, roomsBase }: { room: RoomTypePublic; flip: boolean; roomsBase: string }) {
+  const img = coverOf(room);
+  const photos = photoCount(room);
   return (
-    <li className={`grid items-center gap-8 lg:grid-cols-12 lg:gap-14`}>
-      <Plate
-        src={img?.url}
-        alt={img?.alt ?? room.name}
-        label={room.name}
-        sizes="(min-width: 1024px) 58vw, 100vw"
-        className={`aspect-[4/3] lg:col-span-7 ${flip ? "lg:order-2" : ""}`}
-      />
+    <li className={`grid items-center gap-8 lg:grid-cols-12 lg:gap-14`} data-testid="room-card">
+      <RoomDetailsLink roomsBase={roomsBase} room={room} tabIndex={-1} label={`Photographs and details of the ${room.name}`} className={`group relative block lg:col-span-7 ${flip ? "lg:order-2" : ""}`}>
+        <Plate src={img?.url} alt={img?.alt ?? room.name} label={room.name} sizes="(min-width: 1024px) 58vw, 100vw" className="aspect-[4/3]" imgClassName="group-hover:scale-[1.02]" />
+        {photos > 1 ? <span aria-hidden className="boutique-kicker absolute bottom-4 left-4 bg-paper/90 px-2.5 py-1 !text-ink">{photos} photographs</span> : null}
+      </RoomDetailsLink>
       <div className={`lg:col-span-5 ${flip ? "lg:order-1" : ""}`}>
         <h3 className="display text-[clamp(2.2rem,4vw,3.4rem)]">{room.name}</h3>
         {room.description ? <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-muted">{room.description.split(/(?<=\.)\s/)[0]}</p> : null}
@@ -333,6 +332,9 @@ function BoutiqueRoom({ room, flip }: { room: RoomTypePublic; flip: boolean }) {
           {room.bedType ? ` · ${room.bedType}` : ""}
           {room.sizeSqm ? ` · ${room.sizeSqm} m²` : ""}
         </p>
+        <RoomDetailsLink roomsBase={roomsBase} room={room} className="boutique-kicker mt-5 inline-block border-b border-current pb-1 !text-ink hover:!text-laterite">
+          View details
+        </RoomDetailsLink>
         <div className="boutique-offer mt-8 flex flex-col items-start gap-4 border-t border-line pt-6">
           <RoomOffer room={room} />
         </div>

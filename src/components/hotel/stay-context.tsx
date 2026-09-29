@@ -11,6 +11,7 @@ import { formatNaira } from "@/lib/format";
 import { formatLagosShort } from "@/lib/time";
 import type { RoomTypePublic } from "@/lib/types";
 import { plansFor, type PlanOffer } from "@/lib/rates";
+import { roomHref } from "@/lib/rooms";
 import { PlanLedger } from "../booking/rate-plans";
 import { usePriceCalendar } from "../booking/use-price-calendar";
 import { DateRangeField } from "../search/date-range-field";
@@ -106,6 +107,34 @@ export function StayProvider({
     <Ctx.Provider value={{ availability, roomFor, retryAvailability, range, setRange, guests, setGuests, today, bookHref, calendar, cancellationPolicy }}>
       {children}
     </Ctx.Provider>
+  );
+}
+
+/**
+ * "View details": a room card's link to the room type's own page. Inside a hotel page it carries the
+ * dates and guests the visitor has chosen so far, so the room page opens already priced.
+ */
+export function RoomDetailsLink({
+  roomsBase,
+  room,
+  className = "",
+  children,
+  label,
+  tabIndex,
+}: {
+  roomsBase: string;
+  room: Pick<RoomTypePublic, "id" | "name" | "slug">;
+  className?: string;
+  children?: React.ReactNode;
+  label?: string;
+  tabIndex?: number;
+}) {
+  const stay = useContext(Ctx);
+  const href = roomHref(roomsBase, room, stay ? { checkIn: stay.range.checkIn, checkOut: stay.range.checkOut, guests: stay.guests } : undefined);
+  return (
+    <Link href={href} className={className} aria-label={label ?? `View details of the ${room.name}`} data-testid={tabIndex === -1 ? "room-card-photo" : "view-details"} tabIndex={tabIndex}>
+      {children ?? "View details"}
+    </Link>
   );
 }
 

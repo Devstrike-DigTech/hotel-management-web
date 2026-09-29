@@ -3,11 +3,12 @@ import { formatClock, formatNaira } from "@/lib/format";
 import type { ThemeSection } from "@/lib/theme/types";
 import { AmenityIcon } from "../ui/amenity";
 import { Plate } from "../ui/plate";
-import { MobileBookBar, StayProvider } from "../hotel/stay-context";
+import { MobileBookBar, StayProvider, RoomDetailsLink } from "../hotel/stay-context";
 import { RatesTable } from "./rates-table";
 import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
 import type { SiteCtx } from "./context";
+import { coverOf, photoCount } from "@/lib/rooms";
 import {
   AddressBlock,
   CancellationTimeline,
@@ -156,8 +157,15 @@ function BusinessSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSection
           {[...hotel.roomTypes]
             .sort((a, b) => a.basePriceKobo - b.basePriceKobo)
             .map((r) => (
-              <li key={r.id} className="grid grid-cols-[6.5rem_1fr] gap-4 py-4 sm:grid-cols-[8rem_1fr_auto]">
-                <Plate src={r.images[0]?.url} alt={r.images[0]?.alt ?? r.name} caption={false} sizes="8rem" className="aspect-[4/3]" />
+              <li key={r.id} className="grid grid-cols-[6.5rem_1fr] gap-4 py-4 sm:grid-cols-[8rem_1fr_auto]" data-testid="room-card">
+                <RoomDetailsLink roomsBase={`${ctx.base}/rooms`} room={r} tabIndex={-1} label={`Photographs and details of the ${r.name}`} className="group relative block self-start">
+                  <Plate src={coverOf(r)?.url} alt={coverOf(r)?.alt ?? r.name} caption={false} sizes="8rem" className="aspect-[4/3]" />
+                  {photoCount(r) > 1 ? (
+                    <span aria-hidden className="num absolute bottom-1 right-1 bg-ink/80 px-1 text-[10px] text-paper">
+                      {photoCount(r)}
+                    </span>
+                  ) : null}
+                </RoomDetailsLink>
                 <div className="min-w-0">
                   <h3 className="font-medium">{r.name}</h3>
                   <p className="num mt-0.5 text-[12px] text-ink-muted">
@@ -180,9 +188,14 @@ function BusinessSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSection
                     <span className="text-[11px] text-ink-muted">from </span>
                     <span className="font-medium">{formatNaira(r.fromKobo ?? r.basePriceKobo)}</span>
                   </p>
-                  <a href="#rates" className="inline-flex items-center gap-1 text-[13px] text-laterite hover:underline">
-                    Rates <ArrowRight size={12} aria-hidden />
-                  </a>
+                  <span className="flex items-center gap-3 text-[13px]">
+                    <RoomDetailsLink roomsBase={`${ctx.base}/rooms`} room={r} className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink">
+                      View details
+                    </RoomDetailsLink>
+                    <a href="#rates" className="inline-flex items-center gap-1 text-laterite hover:underline">
+                      Rates <ArrowRight size={12} aria-hidden />
+                    </a>
+                  </span>
                 </div>
               </li>
             ))}

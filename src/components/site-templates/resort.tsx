@@ -4,7 +4,8 @@ import type { RoomTypePublic } from "@/lib/types";
 import { AmenityIcon } from "../ui/amenity";
 import { Plate } from "../ui/plate";
 import { Gallery } from "../hotel/gallery";
-import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
+import { MobileBookBar, RoomDetailsLink, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
+import { coverOf, photoCount } from "@/lib/rooms";
 import { RatesTable } from "./rates-table";
 import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
@@ -196,7 +197,7 @@ function ResortSection({ ctx, section, first }: { ctx: SiteCtx; section: ThemeSe
             {[...hotel.roomTypes]
               .sort((a, b) => a.basePriceKobo - b.basePriceKobo)
               .map((r) => (
-                <ResortRoom key={r.id} room={r} />
+                <ResortRoom key={r.id} room={r} roomsBase={`${ctx.base}/rooms`} />
               ))}
           </ul>
         </div>,
@@ -328,10 +329,19 @@ function ResortSection({ ctx, section, first }: { ctx: SiteCtx; section: ThemeSe
   }
 }
 
-function ResortRoom({ room }: { room: RoomTypePublic }) {
+function ResortRoom({ room, roomsBase }: { room: RoomTypePublic; roomsBase: string }) {
+  const cover = coverOf(room);
+  const photos = photoCount(room);
   return (
-    <li className="flex flex-col overflow-hidden rounded-[24px] border border-line bg-surface">
-      <Plate src={room.images[0]?.url} alt={room.images[0]?.alt ?? room.name} label={room.name} sizes="(min-width: 768px) 45vw, 100vw" className="aspect-[16/10]" />
+    <li className="flex flex-col overflow-hidden rounded-[24px] border border-line bg-surface" data-testid="room-card">
+      <RoomDetailsLink roomsBase={roomsBase} room={room} tabIndex={-1} label={`Photographs and details of the ${room.name}`} className="group relative block">
+        <Plate src={cover?.url} alt={cover?.alt ?? room.name} label={room.name} sizes="(min-width: 768px) 45vw, 100vw" className="aspect-[16/10]" imgClassName="group-hover:scale-[1.03]" />
+        {photos > 1 ? (
+          <span aria-hidden className="num absolute right-4 top-4 rounded-full bg-paper/90 px-3 py-1 text-[12px] text-ink shadow-[var(--shadow-float)]">
+            {photos} photos
+          </span>
+        ) : null}
+      </RoomDetailsLink>
       <div className="flex flex-1 flex-col p-6">
         <h3 className="display-sm text-[1.6rem]">{room.name}</h3>
         {room.description ? <p className="mt-2 line-clamp-3 text-[0.9375rem] leading-relaxed text-ink-muted">{room.description}</p> : null}
@@ -340,6 +350,9 @@ function ResortRoom({ room }: { room: RoomTypePublic }) {
           {room.bedType ? <li className="rounded-full bg-surface-2 px-3 py-1">{room.bedType}</li> : null}
           {room.sizeSqm ? <li className="num rounded-full bg-surface-2 px-3 py-1">{room.sizeSqm} m&sup2;</li> : null}
         </ul>
+        <RoomDetailsLink roomsBase={roomsBase} room={room} className="mt-4 inline-flex w-fit items-center rounded-full border border-line-strong px-4 py-2 text-sm font-medium hover:border-ink">
+          View details
+        </RoomDetailsLink>
         <div className="resort-offer mt-auto flex flex-wrap items-end justify-between gap-4 pt-6">
           <RoomOffer room={room} />
         </div>

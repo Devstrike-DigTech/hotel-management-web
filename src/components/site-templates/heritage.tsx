@@ -2,7 +2,8 @@ import { formatClock, roman } from "@/lib/format";
 import type { ThemeSection } from "@/lib/theme/types";
 import type { RoomTypePublic } from "@/lib/types";
 import { Plate } from "../ui/plate";
-import { MobileBookBar, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
+import { MobileBookBar, RoomDetailsLink, RoomOffer, RoomPlans, StayProvider } from "../hotel/stay-context";
+import { coverOf, photoCount } from "@/lib/rooms";
 import { RatesTable } from "./rates-table";
 import { ConciergeShowcase } from "./concierge";
 import { StayBar } from "./stay-bar";
@@ -138,7 +139,7 @@ function HeritageSection({ ctx, section, n }: { ctx: SiteCtx; section: ThemeSect
           {[...hotel.roomTypes]
             .sort((a, b) => a.basePriceKobo - b.basePriceKobo)
             .map((r) => (
-              <HeritageRoom key={r.id} room={r} />
+              <HeritageRoom key={r.id} room={r} roomsBase={`${ctx.base}/rooms`} />
             ))}
         </ul>,
         section.options.subtitle,
@@ -279,12 +280,14 @@ function HeritageSection({ ctx, section, n }: { ctx: SiteCtx; section: ThemeSect
   }
 }
 
-function HeritageRoom({ room }: { room: RoomTypePublic }) {
+function HeritageRoom({ room, roomsBase }: { room: RoomTypePublic; roomsBase: string }) {
+  const cover = coverOf(room);
+  const photos = photoCount(room);
   return (
-    <li className="text-center">
-      <div className="heritage-frame">
-        <Plate src={room.images[0]?.url} alt={room.images[0]?.alt ?? room.name} label={room.name} sizes="(min-width: 768px) 45vw, 100vw" className="aspect-[4/3]" />
-      </div>
+    <li className="text-center" data-testid="room-card">
+      <RoomDetailsLink roomsBase={roomsBase} room={room} tabIndex={-1} label={`Photographs and details of the ${room.name}`} className="heritage-frame group block">
+        <Plate src={cover?.url} alt={cover?.alt ?? room.name} label={room.name} sizes="(min-width: 768px) 45vw, 100vw" className="aspect-[4/3]" imgClassName="group-hover:scale-[1.02]" />
+      </RoomDetailsLink>
       <h3 className="heritage-title mt-6 text-[1.35rem]">{room.name}</h3>
       <p className="mt-2 font-display italic text-ink-muted">
         For {room.capacity}
@@ -292,6 +295,9 @@ function HeritageRoom({ room }: { room: RoomTypePublic }) {
         {room.sizeSqm ? `, ${room.sizeSqm} square metres` : ""}
       </p>
       {room.description ? <p className="mx-auto mt-4 max-w-md text-[0.9375rem] leading-relaxed text-ink-muted">{room.description}</p> : null}
+      <RoomDetailsLink roomsBase={roomsBase} room={room} className="heritage-caps mt-4 inline-block text-[11px] text-laterite underline decoration-1 underline-offset-[6px] hover:text-ink">
+        View details{photos > 1 ? ` · ${photos} photographs` : ""}
+      </RoomDetailsLink>
       <div className="heritage-offer mx-auto mt-6 flex max-w-xs flex-col items-center gap-4 border-t border-line pt-5">
         <RoomOffer room={room} />
       </div>

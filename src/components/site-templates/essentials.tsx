@@ -5,6 +5,7 @@ import { formatClock, formatNaira, formatPhone, toE164Digits } from "@/lib/forma
 import type { ThemeSection } from "@/lib/theme/types";
 import type { RoomTypePublic } from "@/lib/types";
 import type { SiteCtx } from "./context";
+import { coverOf, photoCount, roomHref } from "@/lib/rooms";
 import { ConciergeShowcase } from "./concierge";
 import { CustomText, diningItems, experienceItems, FaqList, faqItems, highlightItems, meetingItems, PickupList, pickupSentenceFor, titleOf } from "./parts";
 
@@ -25,7 +26,7 @@ export function EssentialsPage({ ctx, sections }: { ctx: SiteCtx; sections: Them
 }
 
 /** A low-resolution thumbnail from the image CDN, loaded only when scrolled to. */
-function thumb(url: string | undefined | null, w: number) {
+export function thumb(url: string | undefined | null, w: number) {
   if (!url) return null;
   try {
     const u = new URL(url);
@@ -149,7 +150,7 @@ function EssentialsSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSecti
           {[...hotel.roomTypes]
             .sort((a, b) => a.basePriceKobo - b.basePriceKobo)
             .map((r) => (
-              <EssentialsRoom key={r.id} room={r} bookBase={ctx.bookBase} />
+              <EssentialsRoom key={r.id} room={r} bookBase={ctx.bookBase} roomsBase={`${ctx.base}/rooms`} />
             ))}
         </ul>,
       );
@@ -294,8 +295,9 @@ function EssentialsSection({ ctx, section }: { ctx: SiteCtx; section: ThemeSecti
   }
 }
 
-function EssentialsRoom({ room, bookBase }: { room: RoomTypePublic; bookBase: string }) {
-  const img = thumb(room.images[0]?.url, 200);
+function EssentialsRoom({ room, bookBase, roomsBase }: { room: RoomTypePublic; bookBase: string; roomsBase: string }) {
+  const img = thumb(coverOf(room)?.url, 200);
+  const photos = photoCount(room);
   const from = room.fromKobo ?? room.basePriceKobo;
   return (
     <li className="lite-room" data-testid="lite-room">
@@ -314,6 +316,9 @@ function EssentialsRoom({ room, bookBase }: { room: RoomTypePublic; bookBase: st
         <p className="mt-1 text-[0.9375rem]">
           <span className="num font-semibold">{formatNaira(from)}</span> <span className="text-ink-muted">a night</span>
         </p>
+        <a href={roomHref(roomsBase, room)} className="mt-1 inline-flex min-h-8 items-center text-sm font-semibold text-laterite underline underline-offset-4" aria-label={`View details of the ${room.name}`} data-testid="view-details">
+          View details{photos > 1 ? `, ${photos} photos` : ""}
+        </a>
       </div>
       <a href={`${bookBase}?room=${encodeURIComponent(room.id)}`} className="lite-btn lite-btn-outline self-center" aria-label={`Book the ${room.name}`}>
         Book

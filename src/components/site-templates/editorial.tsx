@@ -181,7 +181,7 @@ function EditorialSection({ ctx, section, n, first }: { ctx: SiteCtx; section: T
         </ul>,
       );
     case "rooms":
-      return wrap(titleOf(section, "Rooms"), <RoomList rooms={hotel.roomTypes} />, `${hotel.roomTypes.length} ${hotel.roomTypes.length === 1 ? "type" : "types"}`);
+      return wrap(titleOf(section, "Rooms"), <RoomList rooms={hotel.roomTypes} roomsBase={`${ctx.base}/rooms`} />, `${hotel.roomTypes.length} ${hotel.roomTypes.length === 1 ? "type" : "types"}`);
     case "rates-calendar":
       return wrap(titleOf(section, "Rates by date"), <RatesTable rooms={hotel.roomTypes} look="editorial" />);
     case "reviews":
