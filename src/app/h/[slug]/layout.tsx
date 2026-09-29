@@ -10,7 +10,7 @@ import { brandStyle } from "@/lib/brand";
 import { APP_DOMAIN, SITE_URL } from "@/lib/env";
 import { canonicalSite, getHotel, groupRootHref, siteBase } from "@/lib/site";
 import { themeStyle } from "@/lib/theme/normalise";
-import { getSiteTheme, previewToken } from "@/lib/theme/server";
+import { getSiteTheme, previewToken, roomsOnlyToken } from "@/lib/theme/server";
 import { hidesPlatform, whiteLabelTheme } from "@/lib/white-label";
 
 export async function generateMetadata({ params }: LayoutProps<"/h/[slug]">): Promise<Metadata> {
@@ -111,7 +111,7 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
       style={Object.keys(style).length ? style : brandStyle(hotel.branding.accentColor)}
       data-template={theme.templateId}
       data-white-label={wl ? "true" : undefined}
-      data-preview={token ? "true" : undefined}
+      data-preview={token && !roomsOnlyToken(token) ? "true" : undefined}
     >
       {theme.colourMode !== "SYSTEM" ? <script data-lite-keep="" dangerouslySetInnerHTML={{ __html: modeScript(theme.colourMode === "DARK" ? "dark" : "light") }} /> : null}
       {essentials ? (
@@ -122,7 +122,7 @@ export default async function MicrositeLayout({ children, params }: LayoutProps<
       ) : fonts.length ? (
         <BrandFonts hrefs={fonts} />
       ) : null}
-      {token ? <PreviewBanner draft={theme.draft} problem={theme.previewProblem ?? null} /> : null}
+      {token && !roomsOnlyToken(token) ? <PreviewBanner draft={theme.draft} problem={theme.previewProblem ?? null} /> : null}
       <SiteHeader {...chrome} />
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">

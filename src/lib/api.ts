@@ -4,6 +4,7 @@ import { API_URL } from "./env";
 import { clientIpFrom, trustedProxyHeaders } from "./server/client-ip";
 import type { BookingConfig, ReviewPage } from "./booking-types";
 import { normaliseCatalogue, type ConciergeCatalogue } from "./concierge";
+import { normaliseRoomDetail, type RoomDetail } from "./rooms";
 import type {
   ApiErrorBody,
   AppInfo,
@@ -218,6 +219,27 @@ export const api = {
       return cat.unavailable ? null : cat;
     } catch (err) {
       if (err instanceof ApiError && [0, 400, 401, 402, 403, 404, 410].includes(err.status)) return null;
+      throw err;
+    }
+  },
+  /**
+   * Room details (API-ROOMS 5): one room type's page, with prices when a stay is given. Uncached with
+   * dates or a preview token (live prices and drafts); a minute otherwise. Null when the hotel or room is unknown.
+   */
+  roomType: async (
+    slug: string,
+    room: string,
+    q: { checkIn?: string | null; checkOut?: string | null; adults?: number; children?: number; channel?: string; preview?: string | null } = {},
+  ): Promise<RoomDetail | null> => {
+    const live = !!(q.checkIn && q.checkOut) || !!q.preview;
+    try {
+      const raw = await request<unknown>(
+        `/public/hotels/${encodeURIComponent(slug)}/room-types/${encodeURIComponent(room)}${qs({ checkIn: q.checkIn, checkOut: q.checkOut, adults: q.adults, children: q.children, channel: q.channel, preview: q.preview })}`,
+        live ? { revalidate: false } : { revalidate: 60, tags: ["hotels", `hotel:${slug}`, `room:${slug}:${room}`] },
+      );
+      return normaliseRoomDetail(raw);
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 410)) return null;
       throw err;
     }
   },

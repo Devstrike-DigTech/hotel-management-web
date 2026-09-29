@@ -26,7 +26,8 @@ import { stripScripts } from "./lib/server/lite";
  *                      frameable only by the admin's origin (CSP frame-ancestors). ?preview=off leaves.
  *   every site page    `frame-ancestors 'self' <admin origin>`, so nobody else can frame the booking flow.
  *   Essentials home    served without the framework's scripts (see lib/server/lite.ts), and (M8)
- *                      the concierge's catalogue page, which is server-rendered the same way.
+ *                      the concierge's catalogue page and every room's own page ("View details"),
+ *                      which are server-rendered the same way.
  *   ?template=<id>     development only: try a template on any hotel.
  */
 
@@ -138,20 +139,58 @@ const TEMPLATES = new Set(["editorial", "boutique", "business", "resort", "herit
 /** Marks the proxy's own request for the full page, so it is not served "lite" again. Per process. */
 const LITE_SECRET = crypto.randomUUID();
 
+/** A room's draft preview lives in its own cookie, scoped to that room page's path. */
+const ROOM_PREVIEW_COOKIE = "room_preview";
+const SITE_PREVIEW_MAX_AGE = 30 * 60;
+
 interface Preview {
   token: string | null;
-  /** Set the cookie to this token (arrived in the query). */
-  remember?: string;
-  /** Clear the cookie (?preview=off). */
+  /** Set a cookie to this token (arrived in the query). */
+  remember?: { token: string; name: string; path: string; maxAge: number };
+  /** Clear the cookies (?preview=off, or an expired token). */
   forget?: boolean;
 }
+
+/**
+ * What a preview token says about itself: its kinds and expiry. The payload is read, not verified; only
+ * the API verifies tokens. This is just enough to scope and age the cookie that remembers it.
+ */
+function tokenInfo(token: string): { kinds: string[]; exp: number | null } {
+  try {
+    const part = token.split(".")[0] ?? "";
+    const json = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/"))) as { k?: unknown; exp?: unknown };
+    return { kinds: Array.isArray(json.k) ? json.k.filter((x): x is string => typeof x === "string") : [], exp: typeof json.exp === "number" ? json.exp : null };
+  } catch {
+    return { kinds: [], exp: null };
+  }
+}
+const expired = (t: string) => {
+  const exp = tokenInfo(t).exp;
+  return exp !== null && exp * 1000 <= Date.now();
+};
+/** A token for room drafts only (the admin's room editor), as opposed to the Brand Studio's and Form Builder's. */
+const roomsOnly = (t: string) => {
+  const k = tokenInfo(t).kinds;
+  return k.length > 0 && k.every((x) => x === "ROOMS");
+};
 
 function previewOf(req: NextRequest): Preview {
   const q = req.nextUrl.searchParams.get("preview");
   if (q === "off" || q === "0" || q === "false") return { token: null, forget: true };
-  if (q && TOKEN.test(q)) return { token: q, remember: q };
-  const c = req.cookies.get(PREVIEW_COOKIE)?.value;
-  return { token: c && TOKEN.test(c) ? c : null };
+  if (q && TOKEN.test(q)) {
+    if (expired(q)) return { token: q, forget: true }; // the page says the link expired; nothing is remembered
+    const exp = tokenInfo(q).exp;
+    const left = exp ? Math.max(1, Math.floor(exp - Date.now() / 1000)) : SITE_PREVIEW_MAX_AGE;
+    // A room's draft is remembered on that room's page only, for as long as the token lasts.
+    return roomsOnly(q)
+      ? { token: q, remember: { token: q, name: ROOM_PREVIEW_COOKIE, path: req.nextUrl.pathname, maxAge: Math.min(left, 2 * 60 * 60) } }
+      : { token: q, remember: { token: q, name: PREVIEW_COOKIE, path: "/", maxAge: Math.min(left, SITE_PREVIEW_MAX_AGE) } };
+  }
+  const c = req.cookies.get(PREVIEW_COOKIE)?.value ?? req.cookies.get(ROOM_PREVIEW_COOKIE)?.value;
+  if (!c || !TOKEN.test(c)) return { token: null };
+  // An expired token stops previewing and is forgotten.
+  if (expired(c)) return { token: null, forget: true };
+  return { token: c };
 }
 
 function devTemplate(req: NextRequest) {
@@ -159,15 +198,19 @@ function devTemplate(req: NextRequest) {
   return t && TEMPLATES.has(t) ? t : null;
 }
 
-/** Framing and indexing rules, and the preview cookie, on a hotel site's response. */
+/** Framing and indexing rules, and the preview cookies, on a hotel site's response. */
 function finish(req: NextRequest, res: NextResponse, preview: Preview) {
   // Drafts only inside the admin's frames; the live site also in the admin (and itself), nowhere else.
   res.headers.set("Content-Security-Policy", `frame-ancestors ${preview.token ? ADMIN_ORIGIN : `'self' ${ADMIN_ORIGIN}`}`);
   if (preview.token) res.headers.set("X-Robots-Tag", "noindex, nofollow");
   const secure = req.nextUrl.protocol === "https:";
   if (preview.remember)
-    res.cookies.set(PREVIEW_COOKIE, preview.remember, { httpOnly: true, path: "/", maxAge: 30 * 60, sameSite: secure ? "none" : "lax", secure });
-  if (preview.forget) res.cookies.delete(PREVIEW_COOKIE);
+    res.cookies.set(preview.remember.name, preview.remember.token, { httpOnly: true, path: preview.remember.path, maxAge: preview.remember.maxAge, sameSite: secure ? "none" : "lax", secure });
+  if (preview.forget) {
+    res.cookies.set(PREVIEW_COOKIE, "", { path: "/", maxAge: 0 });
+    // The room cookie is scoped to its page: clearing it there (or on ?preview=off) takes this path.
+    if (req.cookies.get(ROOM_PREVIEW_COOKIE)) res.cookies.set(ROOM_PREVIEW_COOKIE, "", { path: req.nextUrl.pathname, maxAge: 0 });
+  }
   return res;
 }
 
@@ -241,8 +284,8 @@ function setSiteHost(headers: Headers, customHost: string | null) {
 
 async function rewriteToSite(req: NextRequest, slug: string, base: string, rest: string, group?: string, customHost: string | null = null) {
   const preview = previewOf(req);
-  // M7: the Essentials home (and M8 its concierge catalogue) goes out without framework scripts (unless this is that very request).
-  if ((rest === "/" || rest === "/concierge") && isDocument(req) && req.headers.get("x-lite-inner") !== LITE_SECRET) {
+  // M7: the Essentials home (and M8 its concierge catalogue, and each room's page) goes out without framework scripts (unless this is that very request).
+  if ((rest === "/" || rest === "/concierge" || /^\/rooms\/[^/]+$/.test(rest)) && isDocument(req) && req.headers.get("x-lite-inner") !== LITE_SECRET) {
     const template = devTemplate(req) ?? (preview.token ? null : await publishedTemplate(slug, clientIpFrom(req.headers)));
     if (template === "essentials") {
       const lite = await liteHome(req, preview);

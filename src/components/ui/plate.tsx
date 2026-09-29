@@ -18,6 +18,13 @@ function unsplashLoader({ src, width, quality }: ImageLoaderProps) {
 
 const isUnsplash = (src: string) => /^https:\/\/(images|plus)\.unsplash\.com\//.test(src);
 
+/**
+ * Only the photo CDN goes through a loader. Everything else (photos hotels upload, served by the
+ * API; a logo or picture on the hotel's own host) is shown as it is: next/image would refuse a host
+ * that is not configured, and the optimiser will not fetch from a private address such as a local API.
+ */
+const optimisable = (src: string) => isUnsplash(src) || src.startsWith("/");
+
 interface PlateProps {
   src: string | null | undefined;
   alt: string;
@@ -67,6 +74,7 @@ export function Plate({ src, alt, sizes, priority, className = "", imgClassName 
           sizes={sizes}
           priority={priority}
           loader={isUnsplash(src) ? unsplashLoader : undefined}
+          unoptimized={!optimisable(src)}
           onLoad={() => setState("loaded")}
           onError={() => setState("error")}
           className={`object-cover transition-[opacity,transform] duration-700 ease-out ${

@@ -4,7 +4,7 @@ type Problem = "EXPIRED" | "NOT_FOUND" | "UNAVAILABLE" | null;
 
 const WHY: Record<Exclude<Problem, null>, string> = {
   EXPIRED: "This preview link has expired, so this is the published site. Reopen the preview from the admin to see your draft.",
-  NOT_FOUND: "This preview link is for another hotel, or for the booking form only, so this is the published site.",
+  NOT_FOUND: "This preview link is for another hotel, or for the booking form only or one room, so the rest is the published site.",
   UNAVAILABLE: "The draft could not be fetched just now, so this is the published site. Reload in a moment.",
 };
 

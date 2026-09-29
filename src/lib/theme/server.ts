@@ -17,6 +17,21 @@ export async function previewToken(): Promise<string | null> {
   return t && /^[A-Za-z0-9._~-]{8,2048}$/.test(t) ? t : null;
 }
 
+/**
+ * True for a token that previews room drafts only (the admin's room editor): the site's theme and form
+ * are the published ones, so the page shows the room's own note instead of the site's preview band.
+ * The payload is read, not verified; the API verifies every token it is given.
+ */
+export function roomsOnlyToken(token: string | null): boolean {
+  if (!token) return false;
+  try {
+    const json = JSON.parse(Buffer.from(token.split(".")[0] ?? "", "base64url").toString("utf8")) as { k?: unknown };
+    return Array.isArray(json.k) && json.k.length > 0 && json.k.every((k) => k === "ROOMS");
+  } catch {
+    return false;
+  }
+}
+
 /** Development only: `?template=boutique` tries a layout on any hotel (the proxy passes it on). */
 async function devTemplate() {
   if (process.env.NODE_ENV === "production") return null;

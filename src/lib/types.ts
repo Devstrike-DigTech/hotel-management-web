@@ -164,6 +164,13 @@ export interface RoomTypePublic {
   /* M4, additive: rate plans sold online for this room type, and the cheapest coming nightly rate. */
   ratePlans?: import("./rates").RawPlan[];
   fromKobo?: number | null;
+  /* Room details (API-ROOMS 6), additive: the stable slug for the room's own page, its cover and a few lines. */
+  slug?: string;
+  coverImage?: { url: string; alt: string; caption?: string | null; tag?: string | null } | null;
+  highlights?: string[];
+  galleryCount?: number;
+  view?: string | null;
+  bedCount?: number;
 }
 
 export interface HotelDetail extends HotelCard {

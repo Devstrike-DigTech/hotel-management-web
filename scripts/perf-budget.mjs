@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Performance budget for the Essentials booking-site template (M7): the JavaScript a hotel page
+ * Performance budget for the Essentials booking-site template (M7; and its room pages): the JavaScript a hotel page
  * transfers on first load must stay under the budget (default 120 KB, compressed as served).
  *
  *   node scripts/perf-budget.mjs [url ...] [--budget-kb 120]
@@ -20,7 +20,7 @@ const budgetKb = at >= 0 ? Number(args[at + 1]) : 120;
 const report = args.filter((a, i) => args[i - 1] === "--report");
 const urls = args.filter((a, i) => /^https?:/.test(a) && args[i - 1] !== "--report");
 const base = process.env.E2E_BASE_URL || "http://localhost:3000";
-if (!urls.length) urls.push(`${base}/h/bodija-heights`);
+if (!urls.length) urls.push(`${base}/h/bodija-heights`, `${base}/h/bodija-heights/rooms/heights-suite`);
 
 const preinstalled = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM || (existsSync(preinstalled) ? preinstalled : undefined);

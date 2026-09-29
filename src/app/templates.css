@@ -443,3 +443,238 @@ body:has([data-template="essentials"])::before {
 .boutique-hero .adire-field {
   opacity: 0.14;
 }
+
+/* ------------------------------------------------------------------ *
+ *  Room details: a room type's own page, in every template.
+ * ------------------------------------------------------------------ */
+
+/* Markdown-lite from the hotel: paragraphs and bullet lines. */
+.room-md > * + * {
+  margin-top: 0.9em;
+}
+.room-md-list {
+  display: grid;
+  gap: 0.35em;
+}
+.room-md-list > li {
+  position: relative;
+  padding-left: 1.4em;
+}
+.room-md-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0.1em;
+  top: 0.78em;
+  width: 0.7em;
+  height: 1px;
+  background: var(--laterite);
+}
+.room-md-dot > li::before {
+  width: 0.3em;
+  height: 0.3em;
+  top: 0.62em;
+  border-radius: 999px;
+  background: var(--brass);
+}
+
+/* The lightbox's picture fades in as it changes. */
+@media (prefers-reduced-motion: no-preference) {
+  .room-lightbox-slide {
+    animation: fade-up 320ms var(--ease-out-soft) both;
+  }
+}
+
+/* The floating "Book this room" strip: always on phones; on wide screens only once the panel scrolled away. */
+@media (width >= 64rem) {
+  .room-book-bar {
+    left: 50%;
+    translate: -50% 0;
+    transition:
+      translate 280ms var(--ease-out-soft),
+      opacity 200ms ease-out,
+      visibility 0s linear 0s;
+  }
+  .room-book-bar[data-away="false"] {
+    translate: -50% 1.5rem;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      translate 200ms ease-in,
+      opacity 160ms ease-in,
+      visibility 0s linear 200ms;
+  }
+}
+
+/* Heritage's panel: a double rule like its photographs. */
+.heritage-panel {
+  border: 1px solid var(--line-strong);
+  outline: 1px solid var(--line-strong);
+  outline-offset: 4px;
+}
+[data-room-page="boutique"] .display {
+  font-weight: 300;
+}
+
+/* ---------------------------------------------------------- Essentials room page (no scripts) */
+
+.lite-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.9375rem;
+}
+.lite-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.lite-chips input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.lite-chips label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  background: var(--surface);
+}
+.lite-chips input:checked + label {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.lite-chips input:focus-visible + label {
+  outline: 2px solid var(--laterite);
+  outline-offset: 2px;
+}
+.lite-thumbs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.lite-thumb a {
+  display: block;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+  aspect-ratio: 4 / 3;
+}
+.lite-thumb img {
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The picture-kind filter, with no script: the checked radio hides the other kinds. */
+.lite-gallery:has(#tag-BEDROOM:checked) .lite-thumb:not([data-tag="BEDROOM"]),
+.lite-gallery:has(#tag-BATHROOM:checked) .lite-thumb:not([data-tag="BATHROOM"]),
+.lite-gallery:has(#tag-VIEW:checked) .lite-thumb:not([data-tag="VIEW"]),
+.lite-gallery:has(#tag-WORKSPACE:checked) .lite-thumb:not([data-tag="WORKSPACE"]),
+.lite-gallery:has(#tag-AMENITY:checked) .lite-thumb:not([data-tag="AMENITY"]),
+.lite-gallery:has(#tag-EXTERIOR:checked) .lite-thumb:not([data-tag="EXTERIOR"]),
+.lite-gallery:has(#tag-OTHER:checked) .lite-thumb:not([data-tag="OTHER"]) {
+  display: none;
+}
+.lite-lb {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #0e0d0b;
+  color: #efe8dc;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 0.5rem 1rem;
+}
+.lite-lb:target {
+  display: flex;
+}
+.lite-lb figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+.lite-lb img {
+  max-width: 100%;
+  max-height: calc(100dvh - 8rem);
+  object-fit: contain;
+}
+.lite-lb figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  text-align: center;
+  opacity: 0.85;
+  padding-inline: 1rem;
+}
+.lite-lb-close,
+.lite-lb-nav {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  color: inherit;
+  background: rgb(0 0 0 / 0.45);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+.lite-lb-close {
+  top: 0.5rem;
+  right: 0.5rem;
+}
+.lite-lb-nav {
+  top: 50%;
+  translate: 0 -50%;
+}
+.lite-lb-prev {
+  left: 0.5rem;
+}
+.lite-lb-next {
+  right: 0.5rem;
+}
+.lite-lb a:focus-visible {
+  outline: 2px solid #e0714b;
+  outline-offset: 2px;
+}
+.lite-rates {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.lite-rates > li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+}
+.lite-rates > li + li {
+  border-top: 1px solid var(--line);
+}
+.lite-bookbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin: 2rem -1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-strong);
+  background: var(--paper);
+}
