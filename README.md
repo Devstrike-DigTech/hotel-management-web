@@ -56,7 +56,7 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint (Next core web vitals and TypeScript rules) |
 | `pnpm test:e2e` | Playwright end-to-end tests against the running app and backend (see Testing) |
-| `pnpm perf:essentials` | M7: JavaScript budget for the Essentials hotel page (see Milestone 7) |
+| `pnpm perf:essentials` | M7: JavaScript budget for the Essentials hotel page and a room page (see Milestone 7 and Room details) |
 
 ## Environment
 
@@ -73,6 +73,7 @@ If it is down, pages still render: sections that depend on it show a quiet notic
 | `TRUSTED_PROXY_SECRET` | a long random string | Server-only. Sent as `X-Proxy-Auth` with the visitor's `X-Client-IP`; must equal the backend's value (see "Trusted client address") |
 | `CLIENT_IP_HEADER` | `cf-connecting-ip` | Optional. A header your host sets with the visitor's address that clients cannot forge |
 | `NEXT_PUBLIC_PARTNER_API_URL` | `https://api.hotelos.ng/api/partner/v1` | Optional (M6). The partner API base the developer docs show; defaults to `NEXT_PUBLIC_API_URL` + `/api/partner/v1` |
+| `API_PUBLIC_URL` | `https://api.hotelos.ng` | Optional, build time. Where the API serves uploaded photos, for `next.config.ts` image hosts; defaults to `NEXT_PUBLIC_API_URL` |
 | `LITE_ORIGIN` | `http://127.0.0.1:3000` | Optional (M7). Where the server reaches itself to render the Essentials home without scripts; defaults to `127.0.0.1:$PORT` |
 | `ALLOWED_DEV_ORIGINS` | `harmattanhotels.com,**.harmattanhotels.com` | Development only (M6). Custom domains pointed at your machine that may load dev assets; defaults to the white-label demo |
 
@@ -140,6 +141,7 @@ Each microsite has its own `robots.txt`, `sitemap.xml` and OpenGraph card in its
 | `/developers/openapi.json` | The spec the reference was built from, to import into Postman or a generator |
 | `/h/[slug]/trips/[code]`, `/h/[slug]/review` | M6: manage a booking and review a stay on a white-labelled hotel's own domain |
 | `/h/[slug]/concierge`, `/h/[slug]/concierge/[id]` | M8: the concierge's catalogue and one service |
+| `/h/[slug]/rooms/[room]`, `/stays/[slug]/rooms/[room]` | Room details: one room type's page, in the hotel's template or the marketplace look |
 | `/concierge/q/[token]`, `/h/[slug]/concierge/q/[token]` | M8: a price from the concierge, by its signed link |
 
 ## Design notes: "Laterite and Adire"
@@ -215,6 +217,7 @@ src/
     site/                     M6 white-label: brand fonts, footer links, platform credit, the site-links context
     site-templates/           M7: the six templates, their chrome, shared sections, rates ledger, stay bar, preview banner; M8 concierge section and pages
     concierge/                M8: request sheet and form, trip requests, quote page, booking step, arrange panel
+    rooms/                    Room details: the room page per template, gallery and lightbox, stay panel and bar, share, JSON-LD, Essentials page
   lib/
     api.ts, types.ts          typed, server-only client for the public API
     rates.ts                  M4 view models: rate plans, price calendar, promo refusals, adapters from the API
@@ -232,6 +235,7 @@ src/
     booking-form.ts           M7: the form model, conditions, client checks, answers, issue mapping, pickup times
     pickup.ts                 M7: pickup kinds, transport companies, prices and terms in words
     concierge.ts              M8: catalogue, requests and quotes as view models, prices and statuses in words, slots
+    rooms.ts                  Room details: the room page view model, card links, markdown-lite; server/room.ts loads it
     server/lite.ts            M7: the Essentials home without framework scripts
     developers/               M6: OpenAPI model, example and sample generation, highlighter, guides, search index
     site.ts                   microsite base path and origin
@@ -828,6 +832,87 @@ kind or on one service:
 `passAddOnsStep` also passes the new optional step, so the earlier booking specs keep working when a hotel offers services
 while booking.
 
+## Room details ("View details" on every room)
+
+Every room type now has a page of its own, reached from a **View details** link on every room card: the six templates, the
+marketplace hotel page, booking step one (with the dates chosen so far) and the Essentials room list. The contract is the
+backend's `API-ROOMS.md` (sections 5 and 6).
+
+| Editorial | Boutique | Business |
+|---|---|---|
+| ![](docs/screenshots/rooms-editorial-1440-light.png) | ![](docs/screenshots/rooms-boutique-1440-light.png) | ![](docs/screenshots/rooms-business-1440-light.png) |
+
+| Resort | Heritage (dark) | Essentials (phone) | Lightbox |
+|---|---|---|---|
+| ![](docs/screenshots/rooms-resort-1440-light.png) | ![](docs/screenshots/rooms-heritage-1440-dark.png) | ![](docs/screenshots/rooms-essentials-390-light.png) | ![](docs/screenshots/rooms-lightbox-1440-dark.png) |
+
+All screens are in [`docs/screenshots/`](docs/screenshots) as `rooms-*.png`: each template and the marketplace at 1440 and 390, light
+and dark, plus the lightbox, a filtered gallery, the rates for dates with the night-by-night breakdown, room cards and booking
+step one, grain off and quantised.
+
+- **Addresses.** `/rooms/{slug}` on a hotel's own host, `/h/{slug}/rooms/{slug}` on the path fallback, and
+  `/stays/{slug}/rooms/{slug}` on the marketplace (a hotel that is not listed there redirects to its own site). The slug is the
+  room type's stable one; an old link by id redirects to it permanently. `?checkIn=&checkOut=&guests=` open the page priced.
+- **The page**, in the template's own manner (Editorial numbered plates and a drop cap; Boutique a full-bleed photograph under the
+  floating header and a strip of pictures; Business rates beside the photographs above the fold, a spec table; Resort a rounded
+  mosaic with the name on a card and pill facts; Heritage double frames, capitals, Roman numerals and dotted leaders; the
+  marketplace in the platform look with a trail): the photographs, name and highlights, the key facts (size, bed, sleeps, view,
+  floor), the hotel's description (markdown-lite rendered as plain elements, never HTML), amenities by group with their Phosphor
+  icons, **Included with your stay** against **Add to your stay** (extras offered with this room, pickups grouped by kind, the
+  concierge's services with prices), policies (cancellation timeline, the room's own rules, extra bed, smoking, taxes, check-in
+  and out) and the hotel's other rooms.
+- **Photographs.** Picture kinds (Bedroom, Bathroom, View...) are filter chips with counts (`aria-pressed`, a live count), and every
+  picture opens a full-screen native `<dialog>`: arrow keys, Home and End, swipe (and swipe down to close), Escape, thumbnails,
+  the caption and kind of each picture, focus back on the picture that opened it, a fade that reduced motion turns off.
+- **Dates and prices.** The side panel reuses the date picker with the hotel's price calendar. The server prices the first view
+  when the address has dates; after that the room endpoint is asked again as the dates or guests change (debounced, cancellable,
+  the last answer kept on screen), and the dates are written back into the address so the share link carries them. Every rate
+  shows its total, marks and cancellation terms; the chosen one opens **night by night** with each tax.
+- **Book this room** opens the booking flow with the room, the chosen rate, the dates and the party filled in (`?room=` takes the
+  room's id or slug; `roomType` and `adults` are accepted too). On phones it is a bar pinned to the bottom; on wide screens it
+  floats up once the side panel has scrolled away. **Share** uses the phone's share sheet, else copies the link; WhatsApp has
+  its own link.
+- **SEO.** Title and description from the API's `seo`, the canonical address on the hotel's canonical host, OpenGraph and Twitter
+  images from the room's cover, `HotelRoom` JSON-LD (bed, occupancy, size, amenities, photographs, the hotel) with an `Offer` per
+  rate (the stay's total and availability with dates, the nightly rate without), and the rooms in the microsite's `sitemap.xml`.
+- **Draft preview.** `?preview=<token>` from the admin's room editor (`POST /room-types/:id/preview-token`) shows the room's
+  unpublished content under a "Room draft" note with "Leave preview", `noindex` (meta and `X-Robots-Tag`); a theme-only token
+  shows the published room. A room token (kinds `["ROOMS"]`) is remembered in its own `room_preview` cookie whose path is that
+  room's page and whose lifetime is the token's, so the rest of the site stays live with no "Draft preview" band; any remembered
+  token that has expired is dropped and stops previewing (the site's Brand Studio cookie too, which also never outlives its token).
+- **Photograph order.** The cover leads (the hero and the lightbox's first picture), then the rest in the hotel's order; a kind
+  filter keeps the hotel's order.
+- **Photos hotels upload** are served by the API (`/api/v1/public/site-assets/...`). `next.config.ts` allows that host (from
+  `API_PUBLIC_URL`, else the public API URL, at build time), and the photo frame shows anything that is not on the photo CDN
+  without the image optimiser, so an unconfigured or private host can never break a page.
+
+### Essentials: the room page without framework JavaScript
+
+The Essentials room page is server components only, and the proxy serves it lite like the home (`x-lite: 1`): photographs are small
+lazy thumbnails that open full screen with plain `#photo-n` links and `:target` (previous, next and close are links), the picture
+kinds filter with radio buttons and CSS `:has()`, dates are a native form that reloads the page priced by the server, and "Book
+this room" is a `position: sticky` link. The one inline script grew by half a kilobyte for Escape and the arrow keys in the
+lightbox: **1.6 KB of script in total** against the 120 KB budget (`pnpm perf:essentials` now checks the home and a room page).
+
+### Tests (room details)
+
+| Spec | What it proves |
+|---|---|
+| `rooms.spec.ts` | View details from a room card in Editorial, Business, Resort, Heritage and Essentials opens the room's page in that template (heading, facts, gallery, amenities, policies, Book, `HotelRoom` and `Offer` JSON-LD, OG image, title) and back; the marketplace card and booking step one link to it; an id link redirects to the slug. The gallery filters by kind (count and `aria-pressed`) and the lightbox moves with the arrow keys and End and closes with Escape, giving focus back. Dates picked in the date picker show the API's total for the stay and write the address; night by night opens; Book this room lands on step one with the room chosen and the dates filled in. A page opened with dates is priced by the server. The Essentials room page is served lite with no script files, under the budget, its photos open and move with the keyboard, its filter works without script, and its date form prices the stay. A photo uploaded through the staff API shows (loaded, from the API's address) on the room's draft preview, which is `noindex`. A cover set on the last photo leads the gallery and the lightbox, and a kind keeps the hotel's order. A room preview's cookie is scoped to that room's page and the token's life, shows no site band elsewhere, ends with Leave preview, and an expired one is dropped |
+
+## Contract notes (room details)
+
+- The room page endpoint, the added room card fields (`slug`, `coverImage`, `highlights`, `galleryCount`), `facts`, `galleryTags`,
+  services, `stay`, policies, `similarRooms` and `seo` match `API-ROOMS.md` against the live backend and its seed.
+- The page builds its own booking link (`?room=&plan=&checkIn=&checkOut=&guests=`) rather than the API's `booking.url`, which uses
+  `roomType` and `adults`; the booking pages accept both spellings.
+- With dates, `stay.unavailableReason` can be `SOLD_OUT` while `bookable` is true; the web goes by `bookable`.
+- The API's facts carry "Sleeps 2 adults + 1 child" under the label "Sleeps"; templates that print the label drop the repeated word.
+- Pickups are listed one line per kind ("Pickup from 3 motor parks, from ₦15,000") and the concierge's services are cut to five
+  with a link to the rest, so a hotel with many of both keeps a readable page.
+- The backend's own test runs can leave room types named "E2E ..." on the demo hotels for a while; the web shows whatever the API
+  lists, and `rooms.spec.ts` ignores them.
+
 ## Contract notes (M8)
 
 - The public catalogue, slots, trip concierge, request creation, cancel and rating, the quote page with accept and decline,
@@ -861,6 +946,7 @@ The suite runs against the real backend and its seed data, one test at a time:
 | `developers.spec.ts`, `white-label.spec.ts`, `harmattan.spec.ts` | M6: the docs and reference, white-label on a custom domain, Harmattan on its dedicated database (see the M6 section) |
 | `m7.spec.ts` | M7: the six templates, the Essentials budget, booking through the hotel's form with an extra and a motor-park pickup, email by payment method, draft preview (see the M7 section) |
 | `m8.spec.ts` | M8: the concierge from the trip page (fixed price paid, quoted price accepted and paid), the booking step, private requests, held free-form asks, the catalogue and Essentials lite (see the M8 section) |
+| `rooms.spec.ts` | Room details: View details from every kind of room card, the gallery filter and lightbox, dates to live prices, Book this room prefilling the booking, the Essentials room page within its budget, an uploaded photo on the draft preview (see "Room details") |
 
 Each test uses a fresh phone number and client address, and stays spread over the coming months, so runs do
 not collide over rooms or the per-phone and per-IP limits. Staff credentials for the review test default to the
