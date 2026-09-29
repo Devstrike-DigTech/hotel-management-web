@@ -106,7 +106,7 @@ test("Essentials stays inside its JavaScript budget", async ({ page }) => {
   const before = await page.evaluate(() => document.documentElement.dataset.theme);
   await page.locator("[data-lite-theme]").click();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).not.toBe(before);
-  await page.getByTestId("lite-room").first().getByRole("link").click();
+  await page.getByTestId("lite-room").first().getByRole("link", { name: /^Book the / }).click();
   await expect(page).toHaveURL(/\/h\/bodija-heights\/book\?room=/);
 });
 
